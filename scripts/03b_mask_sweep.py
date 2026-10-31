@@ -45,7 +45,7 @@ def _sweep(task):
                   for mm, role in nods if role == "gt"]
         rows.append({"scan_id": scan_id, "radius": r, "lung_L": m.sum() / 1e6,
                      "lung_median_hu": float(np.median(full[m])) if m.any() else np.nan,
-                     "gt": len(inside), "gt_inside": sum(inside)})
+                     "n_gt": len(inside), "gt_inside": sum(inside)})
     return rows
 
 
@@ -54,6 +54,7 @@ def main():
     ap.add_argument("--radii", default="10,15,20")
     ap.add_argument("--workers", type=int, default=64)
     ap.add_argument("--n-random", type=int, default=60)
+    ap.add_argument("--summary-only", action="store_true", help="rebuild the table from mask_sweep.csv")
     args = ap.parse_args()
     cfg = load_config()
     iso, tables = cfg["isolate"], cfg["paths"]["tables"]
@@ -69,12 +70,18 @@ def main():
     tasks = [(int(sid), nods.get(sid, []), iso, radii) for sid in pick.scan_id]
     print(f"sweep set: {len(bad)} problem + {len(rand)} random TRAIN scans, radii {radii}")
     t0 = time.time()
-    rows = []
-    with get_context("spawn").Pool(args.workers, initializer=_init) as pool:
-        for r in pool.imap_unordered(_sweep, tasks):
-            rows.extend(r)
-    res = pd.DataFrame(rows).merge(pick[["scan_id", "group"]], on="scan_id")
-    res.to_csv(os.path.join(tables, "mask_sweep.csv"), index=False)
+    csv_path = os.path.join(tables, "mask_sweep.csv")
+    if args.summary_only:
+        res = pd.read_csv(csv_path).rename(columns={"gt": "n_gt"})
+        res = res.drop(columns=["group"]).merge(pick[["scan_id", "group"]], on="scan_id")
+        radii = sorted(res.radius.unique())
+    else:
+        rows = []
+        with get_context("spawn").Pool(args.workers, initializer=_init) as pool:
+            for r in pool.imap_unordered(_sweep, tasks):
+                rows.extend(r)
+        res = pd.DataFrame(rows).merge(pick[["scan_id", "group"]], on="scan_id")
+        res.to_csv(csv_path, index=False)
 
     old = pick.assign(radius="old (3D border, r=10)")
     summary = [{"radius": "old (3D border, r=10)",
@@ -83,12 +90,12 @@ def main():
                 "median L (random)": round(old[old.group == "random"].lung_L.median(), 2)}]
     for r, g in res.groupby("radius"):
         summary.append({"radius": f"new (per-slice), r={r:g}",
-                        "GT inside %": round(100 * g.gt_inside.sum() / max(g.gt.sum(), 1), 1),
+                        "GT inside %": round(100 * g.gt_inside.sum() / max(g.n_gt.sum(), 1), 1),
                         "scans < 2 L": int((g.lung_L < 2).sum()), "scans > 10 L": int((g.lung_L > 10).sum()),
                         "median L (random)": round(g[g.group == "random"].lung_L.median(), 2)})
     lines = ["# Phase 1 · lung-mask sweep (TRAIN scans only, `scripts/03b_mask_sweep.py`)", "",
              f"- sweep set: **{len(bad)}** problem scans + **{len(rand)}** random train scans; "
-             f"**{int(res[res.radius == radii[0]].gt.sum())}** GT nodules; runtime **{time.time() - t0:.0f} s**", "",
+             f"**{int(res[res.radius == radii[0]].n_gt.sum())}** GT nodules; runtime **{time.time() - t0:.0f} s**", "",
              *df_to_md(pd.DataFrame(summary))]
     open(os.path.join(tables, "mask_sweep.md"), "w").write("\n".join(lines) + "\n")
     print("\n".join(lines))
