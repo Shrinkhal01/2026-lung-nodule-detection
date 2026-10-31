@@ -20,7 +20,7 @@ isolate:
   spacing_mm: 1.0
   clip_hu: [-1000, 1000]             # removes the -2048 padding; calcified nodules stay visible
   lung_threshold_hu: -320            # starting value, checked in Phase 1
-  closing_radius_mm: 10              # pulls wall-attached nodules into the mask (gate: >= 98% inside)
+  closing_radius_mm: 15              # chosen by scripts/03b_mask_sweep.py on TRAIN scans (10 -> 91.4%, 15 -> 98.0%, 20 -> 98.7% inside)
   keep_ratio: 0.1                    # 2nd blob kept only if >= 10% of the biggest
   crop_margin_mm: 10
   workers: 32
