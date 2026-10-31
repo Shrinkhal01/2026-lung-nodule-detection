@@ -21,7 +21,7 @@ Flow:
 | Used | Why | Rejected alternative | Number that justified it |
 |---|---|---|---|
 | **`/scratch/mtech_shrinkhal`** for data, env, caches | `/home` is shared and full | `/home`; RAM-only streaming | `/home` **0.4 GiB** free vs `/scratch` **2,683 GiB** |
-| **idc-index** (public IDC bucket) | no login, parallel (s5cmd), resumable | NBIA Data Retriever (GUI + login) | speed test **4.94 MB/s**, full run **~25.9 MB/s** → 128 GB in ~1.5 h |
+| **idc-index** (public IDC bucket) | no login, parallel (s5cmd), resumable | NBIA Data Retriever (GUI + login) | speed test **4.94 MB/s**; full run **128 GB in 1 h 59 min = 18.0 MB/s average** (peak ~25.9) |
 | **Reuse the old venv** (copied to scratch, paths fixed with `sed`) | it already had **torch 2.14.1 + CUDA 13** | fresh torch install | PyPI here: **~0.14–0.19 MB/s** → torch (~2.5 GB) would take hours |
 | **`pip -c keep.txt`** | new packages must not silently replace torch/numpy | plain `pip install` | prevention, NOT MEASURED |
 | **`setuptools<81`** | pylidc imports `pkg_resources` (removed in newer setuptools) | patching pylidc | import error: `No module named 'pkg_resources'` |
@@ -38,7 +38,7 @@ Flow:
   - **−932** ≈ air → most of a chest CT is air (outside the body + lungs)
   - **420** ≈ bone
 - **4 reader marks → 1 nodule** (all 4 readers agree), mean diameter **32.8 mm** → counts as ground truth (≥ 3 readers, ≥ 3 mm).
-- Download time: 125.4 GB × 1024 ÷ 25.9 MB/s ≈ **4,958 s ≈ 83 min**.
+- Download time: 128 GB × 1024 ÷ 18.0 MB/s ≈ **7,280 s ≈ 2 h** → matches the measured **1 h 59 min** (08:45 → 10:44).
 
 ## My image + acronym
 *(Claude's suggestion, replace with your own if you like)*
@@ -56,7 +56,7 @@ Flow:
 - **The gate's air check was too weak:** it passed because of the **−2048 padding**. Phase 1 checks air inside the body.
 - **The 30 mm candidate cap would miss scan #1's 32.8 mm nodule** → this is decided in Phase 2 from all nodule diameters.
 - **pylidc depends on shims** and on an old setuptools. A future setuptools upgrade would break it again.
-- **`/scratch` backup policy is unknown** → code is safe on GitHub; data can be re-downloaded in ~1.5 h.
+- **`/scratch` backup policy is unknown** → code is safe on GitHub; data can be re-downloaded in ~2 h.
 
 ## What I wrote by hand
 - Nothing in Phase 0.
@@ -66,7 +66,7 @@ Flow:
 1. "Full repository structure" → ✅ **yes**: every folder, each with a README.
 2. "Packages installed everywhere" → ✅ **server: all 18**. ⚠ **Mac: test kit only, by design**, because the Mac never runs real data.
 3. "Everything except the files" → ❌ **different**: Phase 0 also needed **code files** (env check, config, fetch check, pylidc shims, gate) **and** started the **download**.
-- **Surprise:** the server's **`/home` was full**, and **PyPI was ~100× slower** than the data bucket (0.19 vs 25.9 MB/s).
+- **Surprise:** the server's **`/home` was full**, and **PyPI was ~100× slower** than the data bucket (0.19 vs 18.0 MB/s average).
 
 ## Still unclear
 - 
