@@ -1,7 +1,7 @@
 # Project map: where am I?
 
 > **Read this first** whenever you come back after a break.
-> **Now:** Phase 1 ✅ (closing) → next **Phase 2 · nominate** on branch `phase-2-nominate`.
+> **Now (Sat 31 Oct, 16:40):** Phases 0–3b ✅. **Next, tonight:** (1) length + fit check (train R2/R5 3× longer, TRAIN vs VAL), (2) pick the final model on VAL, (3) Phase 4 · TEST (test set opened once: R5, R2, R0), (4) Phase 5 · ship. Branch: `phase-4-explain-rate`.
 
 ## The metro line
 ```
@@ -37,8 +37,10 @@ git cc "feat: ..."                                         # commit with Claude 
 ## Phase checklist
 - [x] **0 · setup**: repo, env, download, gate PASS (scan #1, 1 nodule, 4/4 readers)
 - [x] **1 · fetch + isolate**: 897 scans, 1,192 GT nodules, 99.6% inside the lung mask, cache 21.4 GiB
-- [ ] **2 · nominate**: classical candidates + R0
-- [ ] **3 · discard**: R1–R4 training (overnight)
+- [x] **2 · nominate**: per-size quotas, TRAIN recall 96.0% at 2,643/scan, R0 CPM 0.088
+- [x] **3 · discard**: R2 3D CNN VAL CPM 0.778 (R3 tricks hurt, fusion ties)
+- [x] **3b · HUSH**: R5 VAL CPM 0.779 (tie); relies on blobness (no blobness → 0.663)
+- [ ] **check**: training length (3× longer) + TRAIN vs VAL fit, before the test set
 - [ ] **4 · explain + rate**: test once, CIs, heat maps
 - [ ] **5 · ship**: predict.py, Gradio, final docs
 

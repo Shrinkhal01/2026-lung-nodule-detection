@@ -16,7 +16,7 @@ GPU_LIST=(${GPUS:-1 2}); G1=${GPU_LIST[0]}
 LOG="$SCRATCH/logs/phase3b$TAG"; mkdir -p "$LOG"
 
 run() {  # rung seed gpu
-  CUDA_VISIBLE_DEVICES=$3 python scripts/06_train_cnn.py --rung "$1" --seed "$2" --tag "$TAG" $EXTRA > "$LOG/$1_$2.log" 2>&1 \
+  CUDA_VISIBLE_DEVICES=$3 python -u scripts/06_train_cnn.py --rung "$1" --seed "$2" --tag "$TAG" $EXTRA > "$LOG/$1_$2.log" 2>&1 \
     && echo "   done $1 seed $2 on GPU $3: $(tail -1 "$LOG/$1_$2.log")" \
     || echo "   FAILED $1 seed $2 (see $LOG/$1_$2.log)"
 }

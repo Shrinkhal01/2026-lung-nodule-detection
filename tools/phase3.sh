@@ -23,7 +23,7 @@ jobs=(); for s in $SEEDS; do jobs+=("r2 $s" "r3 $s"); done
 for ((g=0; g<NG; g++)); do
   ( for ((n=g; n<${#jobs[@]}; n+=NG)); do
       set -- ${jobs[n]}
-      CUDA_VISIBLE_DEVICES=${GPU_LIST[g]} python scripts/06_train_cnn.py --rung "$1" --seed "$2" --tag "$TAG" $EXTRA \
+      CUDA_VISIBLE_DEVICES=${GPU_LIST[g]} python -u scripts/06_train_cnn.py --rung "$1" --seed "$2" --tag "$TAG" $EXTRA \
         > "$LOG/$1_$2.log" 2>&1 && echo "   done $1 seed $2 on GPU ${GPU_LIST[g]}: $(tail -1 "$LOG/$1_$2.log")" \
         || echo "   FAILED $1 seed $2 (see $LOG/$1_$2.log)"
     done ) &
