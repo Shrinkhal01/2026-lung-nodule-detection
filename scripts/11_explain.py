@@ -86,12 +86,12 @@ def main():
             heat_r, _ = occlusion_map(rnd, cube, transform=tf, device=dev)
             it.update(zip(["hit", "conc"], score_map(heat, centre, radius)))
             it.update(zip(["hit_rnd", "conc_rnd"], score_map(heat_r, centre, radius)))
-            it["corr"] = rank_corr(heat, heat_r)
+            it["rank_corr"] = rank_corr(heat, heat_r)
             it["label"] = f"nodule {n.diameter_mm:.0f} mm, {int(n.n_readers)} readers"
         return it
 
     scored = [explain(rid, r, True) for rid, r in hits.iterrows()]
-    sdf = pd.DataFrame([{k: v for k, v in s.items() if k in ("hit", "conc", "hit_rnd", "conc_rnd", "corr", "p")} for s in scored])
+    sdf = pd.DataFrame([{k: v for k, v in s.items() if k in ("hit", "conc", "hit_rnd", "conc_rnd", "rank_corr", "p")} for s in scored])
     gallery(scored[:N_SHOW], os.path.join(out, "gallery_hits.png"), f"{main_name}: top-scoring real nodules (TEST)", in_ch == 3)
     fa_items = [explain(rid, r, False) | {"label": f"false alarm, blob {r.sigma:.1f} mm"} for rid, r in fas.iterrows()]
     gallery(fa_items, os.path.join(out, "gallery_false_alarms.png"), f"{main_name}: strongest false alarms (TEST)", in_ch == 3)
@@ -106,8 +106,8 @@ def main():
              "| | trained model | random-weights model (sanity check) |", "|---|:-:|:-:|",
              f"| hottest voxel on the nodule (hit) | **{100 * sdf.hit.mean():.0f}%** | {100 * sdf.hit_rnd.mean():.0f}% |",
              f"| share of heat on the nodule (concentration) | **{sdf.conc.mean():.2f}** | {sdf.conc_rnd.mean():.2f} |", "",
-             f"- rank correlation trained vs random map: median **{sdf.corr.median():.2f}** "
-             f"(near 0 = the map depends on what the model learned → sanity check **{'PASSED' if abs(sdf.corr.median()) < 0.3 else 'FAILED'}**)",
+             f"- rank correlation trained vs random map: median **{sdf.rank_corr.median():.2f}** "
+             f"(near 0 = the map depends on what the model learned → sanity check **{'PASSED' if abs(sdf.rank_corr.median()) < 0.3 else 'FAILED'}**)",
              "", "![hits](gallery_hits.png)", "", "![false alarms](gallery_false_alarms.png)", "", "![misses](gallery_misses.png)"]
     open(os.path.join(out, "explain_report.md"), "w").write("\n".join(lines) + "\n")
     print("\n".join(lines[:9]))
