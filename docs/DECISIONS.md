@@ -176,3 +176,12 @@
 | **95% CI = bootstrap over TEST scans** (1,000×, paired between models) | candidates of one scan are not independent | CI over candidates | — |
 | Bootstrap keeps each scan's **top 200** false candidates | only the strongest can matter at ≤ 8 FP/scan | all ~2,650 per scan | 200 ≫ 8 |
 | **Occlusion**: 8 mm block of **normal lung (−850 HU)**, stride 4 mm, **scored** (hit, concentration) + **random-weights sanity check** | "where it looked", proven not fake | Grad-CAM (failed the sanity check in v2) | v2: layer4 Grad-CAM worse than random |
+
+### Length + fit check result (VAL, seeds 42–44)
+- R2: 30 vs 10 epochs **+0.009** (SD 0.012) · R5: **+0.011** (SD 0.014) → not above noise → **keep 10 epochs**.
+- TRAIN AUC **1.000** vs VAL AUC **0.988** (gap 0.011, growing to 0.017 with 30 epochs) → **no underfitting**, mild overfitting with longer training.
+
+### Phase 4 · TEST result (opened once, 31 Oct 2026)
+- **R5 (HUSH) CPM 0.823 [0.767–0.868]** · R2 0.797 [0.725–0.847] · R0 0.058 · ceiling 0.969.
+- **R5 − R2 +0.026 [+0.001, +0.078]** → small, weakly supported.
+- Occlusion (40 nodules): **hit 100%**, **concentration 0.91**; random weights: 0% and 0.00.

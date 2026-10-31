@@ -1,7 +1,7 @@
 # Project map: where am I?
 
 > **Read this first** whenever you come back after a break.
-> **Now (Sat 31 Oct, 16:40):** Phases 0–3b ✅. **Next, tonight:** (1) length + fit check (train R2/R5 3× longer, TRAIN vs VAL), (2) pick the final model on VAL, (3) Phase 4 · TEST (test set opened once: R5, R2, R0), (4) Phase 5 · ship. Branch: `phase-4-explain-rate`.
+> **Now (Sat 31 Oct, 20:00):** Phases 0–4 ✅. **TEST (opened once): HUSH CPM 0.823 [0.767–0.868]**. Next: **Phase 5 · ship** on branch `phase-5-ship`.
 
 ## The metro line
 ```
@@ -40,8 +40,8 @@ git cc "feat: ..."                                         # commit with Claude 
 - [x] **2 · nominate**: per-size quotas, TRAIN recall 96.0% at 2,643/scan, R0 CPM 0.088
 - [x] **3 · discard**: R2 3D CNN VAL CPM 0.778 (R3 tricks hurt, fusion ties)
 - [x] **3b · HUSH**: R5 VAL CPM 0.779 (tie); relies on blobness (no blobness → 0.663)
-- [ ] **check**: training length (3× longer) + TRAIN vs VAL fit, before the test set
-- [ ] **4 · explain + rate**: test once, CIs, heat maps
+- [x] **check**: 30 epochs +0.01 (noise) · TRAIN AUC 1.000 vs VAL 0.988 → keep 10 epochs
+- [x] **4 · TEST**: HUSH 0.823 [0.767–0.868] vs R2 0.797 · occlusion hit 100%, conc 0.91
 - [ ] **5 · ship**: predict.py, Gradio, final docs
 
 ## Open items carried forward
