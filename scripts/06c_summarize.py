@@ -2,7 +2,7 @@
 
   python scripts/06c_summarize.py [--tag _smoke]
 
-R4 fusion = logistic regression on [logit(R3 ensemble), logit(R1)], CROSS-FITTED on val (5 folds by patient),
+R4 fusion = logistic regression on [logit(best CNN ensemble), logit(R1)], CROSS-FITTED on val (5 folds by patient),
 so no candidate is scored by a fusion model that saw it. TEST is not touched.
 """
 import argparse
@@ -65,15 +65,16 @@ def main():
         add(rung.upper(), ens[rung], {"r2": "3D CNN, BCE, random negatives",
                                       "r3": "3D CNN + focal loss + hard negatives + TTA"}[rung] + f", {len(files)}-seed ensemble",
             f"{np.mean(c):.3f} ± {np.std(c):.3f} (n={len(c)})")
-    if "r3" in ens and os.path.exists(os.path.join(sdir, "r1_val.parquet")):
-        X = np.column_stack([logit(ens["r3"]), logit(load(os.path.join(sdir, "r1_val.parquet")))])
+    if ens and os.path.exists(os.path.join(sdir, "r1_val.parquet")):
+        best = max(ens, key=lambda k: cpm(ens[k])["cpm"])          # fuse the BEST CNN rung (chosen on val)
+        X = np.column_stack([logit(ens[best]), logit(load(os.path.join(sdir, "r1_val.parquet")))])
         y = (vm.gt_id >= 0).to_numpy().astype(int)
         fit_ok = ~vm.ignore.to_numpy()
         fused = np.zeros(len(vm))
         for tr, te in GroupKFold(n_splits=5).split(X, y, groups=vm.patient_id):
             tr = tr[fit_ok[tr]]
             fused[te] = LogisticRegression(max_iter=1000).fit(X[tr], y[tr]).predict_proba(X[te])[:, 1]
-        add("R4", fused, "fusion: logistic regression on [R3 ensemble, R1], cross-fitted by patient")
+        add("R4", fused, f"fusion: logistic regression on [{best.upper()} ensemble, R1], cross-fitted by patient")
 
     res = pd.DataFrame(rows)
     res.to_csv(os.path.join(out_dir, "staircase_val.csv"), index=False)

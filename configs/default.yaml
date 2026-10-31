@@ -53,4 +53,4 @@ split:
   fractions: [0.70, 0.15, 0.15]      # train / val / test, by PATIENT
   seed: 42
 
-gpus: "1,2,3"                        # GPU 0 is shared with other users
+gpus: "1,2"                          # use 2 of the 4 shared GPUs (fair use); GPU 0 stays free for others
