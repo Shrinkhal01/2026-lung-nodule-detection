@@ -22,6 +22,7 @@ from lungdet.common.tables import df_to_md  # noqa: E402
 from lungdet.fetch.pylidc_compat import import_pylidc, write_pylidcrc  # noqa: E402
 from lungdet.isolate.geometry import resample  # noqa: E402
 from lungdet.isolate.lungmask import crop_box, lung_mask  # noqa: E402
+from lungdet.isolate.padding import padding_to_air  # noqa: E402
 
 _pl = None
 
@@ -48,6 +49,7 @@ def _process(task):
             vol = scan.to_volume(verbose=False).astype(np.float32)
             spacing = (scan.pixel_spacing, scan.pixel_spacing, scan.slice_spacing)
             lo_hu, hi_hu = iso["clip_hu"]
+            vol, pad = padding_to_air(vol, air=lo_hu)                              # tissue-like padding -> air
             np.clip(vol, lo_hu, hi_hu, out=vol)                                    # N
             full = resample(vol, spacing, iso["spacing_mm"], order=1, cval=lo_hu)  # E
             full_mask = lung_mask(full, iso["lung_threshold_hu"],
@@ -59,7 +61,7 @@ def _process(task):
             offset = lo
             np.savez_compressed(out_path, hu=hu, mask=mask, offset=offset,
                                 spacing_in=np.array(spacing), shape_1mm=np.array(full.shape))
-            stat.update(shape_in=tuple(vol.shape), shape_1mm=tuple(full.shape), reused=False)
+            stat.update(shape_in=tuple(vol.shape), shape_1mm=tuple(full.shape), padding=pad, reused=False)
         stat.update(crop_shape=tuple(hu.shape), lung_L=round(mask.sum() / 1e6, 3),
                     lung_median_hu=float(np.median(hu[mask])) if mask.any() else np.nan,
                     file_MB=round(os.path.getsize(out_path) / 2**20, 1))

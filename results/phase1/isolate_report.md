@@ -1,42 +1,34 @@
 # Phase 1 · isolate report (`scripts/03_isolate.py`)
 
-- scans processed: **897**, failed: **0**, runtime **315 s**
-- lung volume (L): median **5.01**, min **0.00**, max **11.13**
-- lung median HU: median **-856**
-- cache: **20.7 GiB** total, **23.1 MB** per scan (median)
-- GT nodules outside the mask: **61** (their diameters: [5.2, 5.4, 5.4, 5.4, 5.9, 6.0, 6.2, 6.3, 6.5, 6.7, 6.8, 6.8, 7.5, 7.6, 8.0])
+- scans processed: **897**, failed: **0**, runtime **306 s**
+- lung volume (L): median **5.23**, min **1.51**, max **11.33**
+- lung median HU: median **-854**
+- cache: **21.4 GiB** total, **23.4 MB** per scan (median)
+- GT nodules outside the mask: **5** (their diameters: [14.4, 23.6, 24.0, 30.0, 31.3])
 
 ## Gates
 
 | Gate | Result | Value |
 |---|:-:|---|
 | 0 scans failed | PASS | 0 of 897 |
-| lung volume 2–8 L in ≥ 99% of scans | FAIL | 91.4% |
-| lung median HU in [−950, −700] in ≥ 99% of scans | FAIL | 97.8% |
-| GT nodule centres inside the lung mask ≥ 98% | FAIL | 94.9% of 1192 |
-| median HU at GT centres > −400 (coordinates line up) | PASS | 10 HU |
+| lung volume 2–10 L in ≥ 99% of scans | FAIL | 98.7% |
+| lung median HU in [−950, −700] in ≥ 99% of scans | FAIL | 98.9% |
+| GT nodule centres inside the lung mask ≥ 98% | PASS | 99.6% of 1192 |
+| median HU at GT centres > −400 (coordinates line up) | PASS | 11 HU |
 
 ## Scans to look at
 
 | scan_id | patient_id | lung_L | lung_median_hu | error |
 |---|---|---|---|---|
-| 54 | LIDC-IDRI-0043 | 0.024 | -898.0 |  |
-| 84 | LIDC-IDRI-0074 | 1.929 | -732.0 |  |
-| 52 | LIDC-IDRI-0041 | 8.106 | -916.0 |  |
-| 219 | LIDC-IDRI-0218 | 0.023 | -434.0 |  |
-| 121 | LIDC-IDRI-0116 | 9.406 | -883.0 |  |
-| 149 | LIDC-IDRI-0146 | 9.954 | -878.0 |  |
-| 204 | LIDC-IDRI-0203 | 8.013 | -906.0 |  |
-| 182 | LIDC-IDRI-0181 | 0.18 | -905.0 |  |
-| 188 | LIDC-IDRI-0187 | 8.27 | -896.0 |  |
-| 264 | LIDC-IDRI-0264 | 0.013 | -973.0 |  |
-| 210 | LIDC-IDRI-0209 | 8.314 | -868.0 |  |
-| 232 | LIDC-IDRI-0231 | 9.388 | -858.0 |  |
-| 261 | LIDC-IDRI-0261 | 8.146 | -892.0 |  |
-| 319 | LIDC-IDRI-0318 | 0.009 | -433.0 |  |
-| 242 | LIDC-IDRI-0242 | 8.176 | -874.0 |  |
-| 304 | LIDC-IDRI-0304 | 8.801 | -911.0 |  |
-| 311 | LIDC-IDRI-0311 | 0.001 | -599.0 |  |
-| 309 | LIDC-IDRI-0309 | 9.523 | -937.0 |  |
-| 337 | LIDC-IDRI-0335 | 0.002 | -431.5 |  |
-| 341 | LIDC-IDRI-0339 | 0.08 | -929.0 |  |
+| 84 | LIDC-IDRI-0074 | 1.961 | -730.0 |  |
+| 149 | LIDC-IDRI-0146 | 10.119 | -876.0 |  |
+| 407 | LIDC-IDRI-0403 | 1.722 | -743.0 |  |
+| 333 | LIDC-IDRI-0332 | 10.552 | -922.0 |  |
+| 334 | LIDC-IDRI-0332 | 10.023 | -910.0 |  |
+| 452 | LIDC-IDRI-0447 | 1.547 | -689.0 |  |
+| 478 | LIDC-IDRI-0473 | 10.413 | -918.0 |  |
+| 617 | LIDC-IDRI-0612 | 10.066 | -899.0 |  |
+| 619 | LIDC-IDRI-0614 | 11.086 | -961.0 |  |
+| 841 | LIDC-IDRI-0814 | 1.515 | -757.0 |  |
+| 1000 | LIDC-IDRI-0655 | 11.329 | -903.0 |  |
+| 1011 | LIDC-IDRI-0644 | 1.806 | -707.0 |  |

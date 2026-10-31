@@ -66,3 +66,18 @@ def test_one_leak_no_longer_deletes_a_lung():
     assert not old[60, 28, 25]                                   # 3D rule: whole left lung gone
     assert new[60, 28, 25]                                       # per-slice rule: lung kept
     assert new[60, 92, 25]
+
+
+def test_tissue_like_padding_becomes_air():
+    """Padding of 0 HU outside a round field of view seals the outside air; the fix reopens it."""
+    from lungdet.isolate.padding import padding_to_air
+    hu = _phantom()
+    i, j = np.ogrid[0:120, 0:120]
+    outside_fov = ((i - 60) ** 2 + (j - 60) ** 2) > 58 ** 2        # r = 58: the circle must not reach row/col 119
+    hu[outside_fov] = 0.0                                          # tissue-like padding in the corners
+    broken = lung_mask(hu, closing_radius_mm=10)
+    fixed_vol, pad = padding_to_air(hu)
+    fixed = lung_mask(fixed_vol, closing_radius_mm=10)
+    assert pad == 0.0
+    assert broken[60, 60, 30]                                      # bug: mask swallows the body
+    assert not fixed[60, 60, 30] and fixed[60, 28, 30] and fixed[60, 92, 30]
