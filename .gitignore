@@ -36,3 +36,4 @@ venv/
 # --- big or throw-away results (kept on the server) ---
 results/*_smoke/
 results/**/*.parquet
+models/

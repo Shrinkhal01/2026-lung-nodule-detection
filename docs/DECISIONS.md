@@ -155,3 +155,13 @@
 | **Rule: a rung earns its place** only if its 5-seed mean beats the rung below by more than the larger seed SD | avoid reading noise as progress | any increase | v2 + Phase 3 seed spreads |
 | **Explanation by ablation:** blank blobness / vesselness at test time | measures what the network relies on | heat maps only | see `phase3b_report.md` |
 | **2 GPUs + 40 GB memory cap** per process | fair use of the shared server | 3 GPUs, no cap | your choice |
+
+### Phase 3b result (VAL)
+| Rung | CPM ensemble | 5 seeds | Verdict |
+|---|:-:|:-:|---|
+| R2 | 0.778 | 0.760 ± 0.013 | baseline |
+| R5 +H | **0.779** | 0.768 ± 0.012 | not above noise (+0.008) |
+| R6 +U | 0.776 | 0.762 ± 0.008 | not above noise; most stable |
+| R7 +S | 0.772 | 0.751 ± 0.018 | not above noise |
+- **Ablation (R5, 1 seed):** no blobness **0.663**, no vesselness 0.695, HU only **0.397** → it relies on the physics channels (with the out-of-distribution caveat).
+- **Final model for Phase 4: HUSH = R5 ensemble** (VAL 0.779, ties R2 0.778, explainable through its channels).
