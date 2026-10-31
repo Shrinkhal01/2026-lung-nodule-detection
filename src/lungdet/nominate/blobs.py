@@ -24,8 +24,12 @@ def log_peaks(hu, mask, sigmas, floor=30.0, min_hu=-700.0):
     return np.vstack(out) if out else np.zeros((0, 5))
 
 
-def bundle(peaks, max_keep=3000):
-    """Greedy non-maximum suppression: strongest first; drop weaker peaks inside its blob radius (>= 3 mm)."""
+def bundle(peaks, max_keep=3000, mode="blob"):
+    """Greedy non-maximum suppression, strongest first.
+    mode="blob":  drop weaker peaks inside the STRONGER blob's radius (>= 3 mm)
+                  -> a big blob (sigma 13 -> 22.5 mm) also wipes out small nodules next to it
+    mode="scale": drop weaker peaks only inside the SMALLER blob's radius (>= 3 mm) = the same blob seen twice
+    """
     if len(peaks) == 0:
         return peaks
     peaks = peaks[np.argsort(-peaks[:, 4])]
@@ -38,6 +42,10 @@ def bundle(peaks, max_keep=3000):
         keep.append(n)
         if len(keep) >= max_keep:
             break
-        radius = max(3.0, np.sqrt(3) * peaks[n, 3])
-        alive[tree.query_ball_point(peaks[n, :3], radius)] = False
+        near = np.array(tree.query_ball_point(peaks[n, :3], max(3.0, np.sqrt(3) * peaks[n, 3])), dtype=int)
+        if mode == "scale" and len(near):
+            d = np.linalg.norm(peaks[near, :3] - peaks[n, :3], axis=1)
+            limit = np.maximum(3.0, np.sqrt(3) * np.minimum(peaks[near, 3], peaks[n, 3]))
+            near = near[d <= limit]
+        alive[near] = False
     return peaks[keep]

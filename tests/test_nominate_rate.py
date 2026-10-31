@@ -46,3 +46,12 @@ def test_froc_toy_cpm():
     r = froc(scores=[0.9, 0.8, 0.5, 0.95], gt_id=[0, -1, 1, -1], ignore=[False] * 4, n_gt=2, n_scans=2)
     assert r["sens_at"][0.5] == 0.5 and r["sens_at"][1] == 1.0 and r["sens_at"][0.25] == 0.0
     assert abs(r["cpm"] - 4.5 / 7) < 1e-9
+
+
+def test_scale_bundling_keeps_small_nodule_next_to_big_blob():
+    peaks = np.array([[10, 10, 10, 13.0, 900.0],    # big blob (radius ~22.5 mm)
+                      [10, 10, 11, 9.0, 850.0],     # the same big blob at the next scale -> merge
+                      [20, 10, 10, 1.5, 400.0]])    # small nodule 10 mm away -> must survive
+    assert len(bundle(peaks, mode="blob")) == 1     # old rule: the nodule is erased
+    out = bundle(peaks, mode="scale")
+    assert len(out) == 2 and out[1, 0] == 20
