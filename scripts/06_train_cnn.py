@@ -48,6 +48,9 @@ def main():
     ap.add_argument("--tag", default="")
     ap.add_argument("--epochs", type=int, default=None)
     ap.add_argument("--steps", type=int, default=None, help="steps per epoch")
+    ap.add_argument("--suffix", default="", help="name variant, e.g. _long (keeps the 10-epoch results intact)")
+    ap.add_argument("--out", default=None, help="results sub-folder (default: phase3 / phase3b by rung)")
+    ap.add_argument("--eval-every", type=int, default=0, help="also score VAL every N epochs (learning curve)")
     args = ap.parse_args()
     R = RUNGS[args.rung]
     cfg = load_config()
@@ -58,7 +61,8 @@ def main():
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     gpu_cap(hc["max_gpu_gb"])
     pdir = cfg["paths"]["patches"] + args.tag
-    out_dir = os.path.join(cfg["paths"]["results"], R["out"] + args.tag)
+    out_dir = os.path.join(cfg["paths"]["results"], (args.out or R["out"]) + args.tag)
+    name = f"{args.rung}{args.suffix}"
     os.makedirs(os.path.join(out_dir, "scores"), exist_ok=True)
     os.makedirs(cfg["paths"]["checkpoints"], exist_ok=True)
     sig = tuple(hc["hessian_sigmas_mm"])
@@ -86,6 +90,13 @@ def main():
     opt = torch.optim.AdamW(model.parameters(), lr=dc["lr"], weight_decay=1e-4)
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=dc["lr"], total_steps=epochs * steps)
     n_pos = int(round(batch * dc["pos_frac"]))
+    tables_ = cfg["paths"]["tables"]
+    vmeta = pd.read_parquet(os.path.join(pdir, "val_meta.parquet"))
+    scans_ = pd.read_csv(os.path.join(tables_, "scans.csv"))
+    val_scans = scans_[(scans_.split == "val") & scans_.eligible & scans_.scan_id.isin(vmeta.scan_id)]
+    n_gt = ((nod.role == "gt") & nod.scan_id.isin(val_scans.scan_id)).sum()
+    ib = 4096 if R["in_ch"] == 1 else hc["infer_batch"]
+    vcubes, curve = None, []
     t0 = time.time()
     for ep in range(epochs):
         model.train()
@@ -109,18 +120,29 @@ def main():
             opt.step()
             sched.step()
             tot += loss.item()
-        print(f"  epoch {ep + 1}/{epochs}  loss {tot / steps:.4f}  {time.time() - t0:.0f} s")
+        print(f"  epoch {ep + 1}/{epochs}  loss {tot / steps:.4f}  {time.time() - t0:.0f} s", flush=True)
+        if args.eval_every and (ep + 1) % args.eval_every == 0 and ep + 1 < epochs:
+            if vcubes is None:
+                vcubes = torch.from_numpy(np.load(os.path.join(pdir, "val_cubes.npy")))   # stays in RAM; batches go to the GPU
+            p = predict(model, vcubes, batch=ib, tta=R["tta"], transform=prep)
+            c = froc(p, vmeta.gt_id, vmeta.ignore, n_gt=n_gt, n_scans=len(val_scans))["cpm"]
+            curve.append({"epoch": ep + 1, "val_cpm": round(c, 4)})
+            print(f"    VAL CPM at epoch {ep + 1}: {c:.3f}", flush=True)
+    # fit check: how well does the model score TRAIN candidates (positives + random negatives)?
+    from sklearn.metrics import roc_auc_score
+    fit = (m.kind.isin(["cand_pos", "neg_random"])).to_numpy()
+    p_tr = predict(model, cubes[torch.from_numpy(np.where(fit)[0]).to(dev)], batch=ib, transform=prep)
+    train_auc = float(roc_auc_score(m.label.to_numpy()[fit], p_tr))
     del cubes
     torch.cuda.empty_cache()
-    ckpt = os.path.join(cfg["paths"]["checkpoints"], f"{args.rung}_seed{args.seed}{args.tag}.pth")
+    ckpt = os.path.join(cfg["paths"]["checkpoints"], f"{name}_seed{args.seed}{args.tag}.pth")
     torch.save(model.state_dict(), ckpt)
 
-    vmeta = pd.read_parquet(os.path.join(pdir, "val_meta.parquet"))
-    vcubes = torch.from_numpy(np.load(os.path.join(pdir, "val_cubes.npy"), mmap_mode="r")[:]).to(dev)
-    ib = 4096 if R["in_ch"] == 1 else hc["infer_batch"]
+    if vcubes is None:
+        vcubes = torch.from_numpy(np.load(os.path.join(pdir, "val_cubes.npy")))   # stays in RAM; batches go to the GPU
     scores = pd.DataFrame({"row": vmeta.row, "prob": predict(model, vcubes, batch=ib, tta=R["tta"], transform=prep)})
     first_seed = args.seed == cfg["discard"]["seeds"][0]
-    if R["in_ch"] == 3 and first_seed:                      # explanation: what does the network rely on?
+    if R["in_ch"] == 3 and first_seed and not args.suffix:                      # explanation: what does the network rely on?
         def zero(ch):
             def f(x):
                 x = prep(x)
@@ -130,15 +152,16 @@ def main():
         scores["prob_no_blob"] = predict(model, vcubes, batch=ib, transform=zero([1]))
         scores["prob_no_vessel"] = predict(model, vcubes, batch=ib, transform=zero([2]))
         scores["prob_hu_only"] = predict(model, vcubes, batch=ib, transform=zero([1, 2]))
-    scores.to_parquet(os.path.join(out_dir, "scores", f"{args.rung}_seed{args.seed}_val.parquet"))
-    scans = pd.read_csv(os.path.join(tables, "scans.csv"))
-    val_scans = scans[(scans.split == "val") & scans.eligible & scans.scan_id.isin(vmeta.scan_id)]
-    n_gt = ((nod.role == "gt") & nod.scan_id.isin(val_scans.scan_id)).sum()
+    scores.to_parquet(os.path.join(out_dir, "scores", f"{name}_seed{args.seed}_val.parquet"))
+    lab = (vmeta.gt_id >= 0).to_numpy()
+    keep_v = ~vmeta.ignore.to_numpy()
+    val_auc = float(roc_auc_score(lab[keep_v], scores.prob.to_numpy()[keep_v]))
     r = froc(scores.prob, vmeta.gt_id, vmeta.ignore, n_gt=n_gt, n_scans=len(val_scans))
-    summary = {"rung": args.rung, "seed": args.seed, "val_cpm": r["cpm"], "sens_at": r["sens_at"],
+    summary = {"rung": name, "seed": args.seed, "epochs": epochs, "val_cpm": r["cpm"], "sens_at": r["sens_at"],
+               "train_auc": train_auc, "val_auc": val_auc, "curve": curve + [{"epoch": epochs, "val_cpm": round(r["cpm"], 4)}],
                "train_seconds": round(time.time() - t0), "checkpoint": ckpt}
-    json.dump(summary, open(os.path.join(out_dir, "scores", f"{args.rung}_seed{args.seed}.json"), "w"), indent=2)
-    print(f"VAL CPM {r['cpm']:.3f}  ({args.rung}, seed {args.seed})")
+    json.dump(summary, open(os.path.join(out_dir, "scores", f"{name}_seed{args.seed}.json"), "w"), indent=2)
+    print(f"VAL CPM {r['cpm']:.3f}  train AUC {train_auc:.4f}  val AUC {val_auc:.4f}  ({name}, seed {args.seed})")
 
 
 if __name__ == "__main__":

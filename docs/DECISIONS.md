@@ -165,3 +165,23 @@
 | R7 +S | 0.772 | 0.751 ± 0.018 | not above noise |
 - **Ablation (R5, 1 seed):** no blobness **0.663**, no vesselness 0.695, HU only **0.397** → it relies on the physics channels (with the out-of-distribution caveat).
 - **Final model for Phase 4: HUSH = R5 ensemble** (VAL 0.779, ties R2 0.778, explainable through its channels).
+
+## Length + fit check, then Phase 4 · TEST
+| Used | Why | Rejected alternative | Number that justified it |
+|---|---|---|---|
+| **Length check before TEST**: R2 and R5 at **30 epochs** (seeds 42–44), learning curve at 10/20/30, TRAIN vs VAL AUC | answer "train longer?" and "under- or over-fitting?" with numbers, **before** the test set is opened | test first, tune later (a second look at TEST) | see `results/check/check_report.md` |
+| Switch to a long model only if it beats its 10-epoch version by **> the seed SD** | same rule as every rung | any gain | — |
+| **VAL cubes stay in RAM**, sent to the GPU in batches | a 30-epoch run holding TRAIN + VAL on the GPU went over the 40 GB cap | raise the cap | OOM: 36 GB used + 8 GB more |
+| **TEST opened once**: `TEST_OPENED` marker; a second run refuses unless `FORCE=1` | the only unbiased number | free re-runs | — |
+| **95% CI = bootstrap over TEST scans** (1,000×, paired between models) | candidates of one scan are not independent | CI over candidates | — |
+| Bootstrap keeps each scan's **top 200** false candidates | only the strongest can matter at ≤ 8 FP/scan | all ~2,650 per scan | 200 ≫ 8 |
+| **Occlusion**: 8 mm block of **normal lung (−850 HU)**, stride 4 mm, **scored** (hit, concentration) + **random-weights sanity check** | "where it looked", proven not fake | Grad-CAM (failed the sanity check in v2) | v2: layer4 Grad-CAM worse than random |
+
+### Length + fit check result (VAL, seeds 42–44)
+- R2: 30 vs 10 epochs **+0.009** (SD 0.012) · R5: **+0.011** (SD 0.014) → not above noise → **keep 10 epochs**.
+- TRAIN AUC **1.000** vs VAL AUC **0.988** (gap 0.011, growing to 0.017 with 30 epochs) → **no underfitting**, mild overfitting with longer training.
+
+### Phase 4 · TEST result (opened once, 31 Oct 2026)
+- **R5 (HUSH) CPM 0.823 [0.767–0.868]** · R2 0.797 [0.725–0.847] · R0 0.058 · ceiling 0.969.
+- **R5 − R2 +0.026 [+0.001, +0.078]** → small, weakly supported.
+- Occlusion (40 nodules): **hit 100%**, **concentration 0.91**; random weights: 0% and 0.00.

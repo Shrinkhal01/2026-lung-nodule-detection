@@ -1,7 +1,7 @@
 # Project map: where am I?
 
 > **Read this first** whenever you come back after a break.
-> **Now:** Phase 1 ✅ (closing) → next **Phase 2 · nominate** on branch `phase-2-nominate`.
+> **Now (Sat 31 Oct, 20:00):** Phases 0–4 ✅. **TEST (opened once): HUSH CPM 0.823 [0.767–0.868]**. Next: **Phase 5 · ship** on branch `phase-5-ship`.
 
 ## The metro line
 ```
@@ -37,9 +37,11 @@ git cc "feat: ..."                                         # commit with Claude 
 ## Phase checklist
 - [x] **0 · setup**: repo, env, download, gate PASS (scan #1, 1 nodule, 4/4 readers)
 - [x] **1 · fetch + isolate**: 897 scans, 1,192 GT nodules, 99.6% inside the lung mask, cache 21.4 GiB
-- [ ] **2 · nominate**: classical candidates + R0
-- [ ] **3 · discard**: R1–R4 training (overnight)
-- [ ] **4 · explain + rate**: test once, CIs, heat maps
+- [x] **2 · nominate**: per-size quotas, TRAIN recall 96.0% at 2,643/scan, R0 CPM 0.088
+- [x] **3 · discard**: R2 3D CNN VAL CPM 0.778 (R3 tricks hurt, fusion ties)
+- [x] **3b · HUSH**: R5 VAL CPM 0.779 (tie); relies on blobness (no blobness → 0.663)
+- [x] **check**: 30 epochs +0.01 (noise) · TRAIN AUC 1.000 vs VAL 0.988 → keep 10 epochs
+- [x] **4 · TEST**: HUSH 0.823 [0.767–0.868] vs R2 0.797 · occlusion hit 100%, conc 0.91
 - [ ] **5 · ship**: predict.py, Gradio, final docs
 
 ## Open items carried forward

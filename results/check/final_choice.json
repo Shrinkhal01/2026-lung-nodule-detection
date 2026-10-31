@@ -1,0 +1,12 @@
+{
+  "rung": "r5",
+  "suffix": "",
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "why": "default: HUSH R5 (10 epochs)"
+}
