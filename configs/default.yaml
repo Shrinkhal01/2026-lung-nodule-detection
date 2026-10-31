@@ -29,8 +29,10 @@ nominate:                            # LoG blob detector (BLOB); diameter found 
   sigmas_mm: [1.0, 1.5, 2.5, 4.0, 6.0, 9.0, 13.0]   # ~3.5 to ~45 mm (largest GT nodule: 46.8 mm)
   min_hu: -700                       # a peak must not be air
   floor: 30                          # lowest blob response stored before the sweep
-  max_per_scan: 3000                 # strongest candidates kept per scan before the sweep
-  recall_target: 0.95                # threshold = fewest candidates reaching this TRAIN recall
+  max_per_scan: 30000                # storage cap per scan (the 3,000 cap cost 56 of 59 missed TRAIN nodules)
+  recall_target: 0.95                # selection = fewest candidates reaching this TRAIN recall
+  sweep_global_top: [1000, 2000, 3000, 5000, 8000, 12000, 20000, 30000]   # keep the N strongest per scan
+  sweep_per_scale_top: [100, 200, 300, 500, 800, 1200, 2000, 3000]       # keep the q strongest PER SIZE per scan
   workers: 64
 
 discard:

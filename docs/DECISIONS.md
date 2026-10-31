@@ -103,3 +103,18 @@
 | **Bundle = greedy NMS within the blob radius (≥ 3 mm)** | one blob → one candidate | keep all peaks | NOT MEASURED (see median peaks vs kept) |
 | **Threshold = fewest candidates with TRAIN recall ≥ 95%** | recall first; nothing later can recover a miss | fixed threshold | see `nominate_report.md` |
 | **R0 = rank by blob response only, FROC on VAL** | the "no learning" floor of the staircase | none | see `nominate_report.md` |
+
+### First full run: TRAIN recall stuck at 92.8% → diagnosis (`scripts/04b_miss_diagnosis.py`)
+| Cause of the 59 missed TRAIN nodules | Nodules | Median diameter | Median HU at centre |
+|---|:-:|:-:|:-:|
+| **ranked below the 3,000 cap** | **56** | 7.8 mm | −520 (faint / part-solid) |
+| erased by bundling | 2 | 9.3 mm | −28 |
+| below the −700 HU rule | 1 | 8.2 mm | −743 |
+- Scale-aware bundling recovers **0** within the cap → bundling was **not** the problem. My suspicion was wrong; the measurement decided.
+- **The cap was the problem.** Each scan has about **20,860** bundled candidates, and small, faint nodules rank below big bright vessels.
+- **Fix:**
+  - store up to **30,000** per scan
+  - sweep two selection rules **on TRAIN only**:
+    - global top-N
+    - **per-size top-q**, where each blob size gets its own quota, so small faint blobs don't compete with big bright ones
+  - the script **picks automatically** (fewest candidates reaching 95% TRAIN recall)
