@@ -25,8 +25,13 @@ isolate:
   crop_margin_mm: 10
   workers: 32
 
-nominate:
-  size_range_mm: [3.0, 30.0]         # tuned on TRAIN scans in Phase 2
+nominate:                            # LoG blob detector (BLOB); diameter found ~ 3.5 x sigma
+  sigmas_mm: [1.0, 1.5, 2.5, 4.0, 6.0, 9.0, 13.0]   # ~3.5 to ~45 mm (largest GT nodule: 46.8 mm)
+  min_hu: -700                       # a peak must not be air
+  floor: 30                          # lowest blob response stored before the sweep
+  max_per_scan: 3000                 # strongest candidates kept per scan before the sweep
+  recall_target: 0.95                # threshold = fewest candidates reaching this TRAIN recall
+  workers: 64
 
 discard:
   cube_mm: 32

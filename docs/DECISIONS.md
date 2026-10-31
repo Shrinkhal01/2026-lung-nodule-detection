@@ -92,3 +92,14 @@
   - a mask that is **too big** adds false candidates that Phase 3 can reject; it does **not** lose nodules
   - the number that matters, **nodules inside = 99.6%**, already passes
   - Phase 2 reports their candidate counts separately; if they dominate the false alarms, we come back to them
+
+## Phase 2: nominate (BLOB)
+| Used | Why | Rejected alternative | Number that justified it |
+|---|---|---|---|
+| **Multi-scale LoG blob detector** | balls respond more than tubes (vessels) or sheets (walls); classical and explainable | threshold + connected blobs (vessel trees merge with nodules) | theory at matched size: ball **0.86 × contrast**, tube **0.73 ×** (`test_ball_beats_vessel`) |
+| **σ = 1, 1.5, 2.5, 4, 6, 9, 13 mm** | diameter ≈ 3.5 σ → 3.5–45 mm | one size | Phase 1: largest GT **46.8 mm**, 48 GT > 30 mm |
+| **Outside the mask set to −1000 HU** before LoG | the chest wall can't make blobs; wall-attached nodules stand out | LoG on the raw scan | NOT MEASURED |
+| **Peak HU > −700** | air can't be a nodule | no check | NOT MEASURED; size table will show ground-glass losses |
+| **Bundle = greedy NMS within the blob radius (≥ 3 mm)** | one blob → one candidate | keep all peaks | NOT MEASURED (see median peaks vs kept) |
+| **Threshold = fewest candidates with TRAIN recall ≥ 95%** | recall first; nothing later can recover a miss | fixed threshold | see `nominate_report.md` |
+| **R0 = rank by blob response only, FROC on VAL** | the "no learning" floor of the staircase | none | see `nominate_report.md` |
