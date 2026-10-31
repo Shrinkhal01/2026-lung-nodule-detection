@@ -82,7 +82,7 @@ def main():
     suffix = f"_limit{args.limit}" if args.limit else ""
     cand.to_parquet(os.path.join(cand_dir, f"candidates_all{suffix}.parquet"))
 
-    gt = nod[(nod.role == "gt") & nod.scan_id.isin(scans.scan_id)].merge(scans[["scan_id", "split"]], on="scan_id")
+    gt = nod[(nod.role == "gt") & nod.scan_id.isin(scans.scan_id)]       # nodules.csv already has the split
 
     def recall_at(split, t):
         c = cand[(cand.split == split) & (cand.response >= t) & (cand.gt_id >= 0)]
