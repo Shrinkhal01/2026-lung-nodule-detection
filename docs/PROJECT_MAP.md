@@ -1,12 +1,12 @@
 # Project map: where am I?
 
 > **Read this first** whenever you come back after a break.
-> **Now (Sat 31 Oct, evening):** Phases 0–4 ✅. **TEST (opened once): HUSH CPM 0.823 [0.767–0.868]**. **Phase 5 · ship** is built on branch `phase-5-ship` (code, demo, docs, figures); left: run `bash tools/phase5.sh` **on the Mac** (the server is only read by rsync), commit, PR, tag **v1.0**.
+> **Now:** Phases 0–5 ✅, **v1.0 tagged**. **TEST (opened once): HUSH CPM 0.823 [0.767–0.868]**. Nothing is pending; new work starts on a new branch.
 
 ## The metro line
 ```
 main ── phase-0-setup ── phase-1-fetch-isolate ── phase-2 ── phase-3 ── phase-4 ── phase-5
-        SETUP ✅          PLANET ✅                N (next)   D          E + R      S
+        SETUP ✅          PLANET ✅                N ✅        D ✅        E + R ✅    S ✅
 ```
 Each phase: branch → work → notes (`docs/phases/PHASE_N.md`) → PR → merge into `main`.
 
@@ -42,11 +42,10 @@ git cc "feat: ..."                                         # commit with Claude 
 - [x] **3b · HUSH**: R5 VAL CPM 0.779 (tie); relies on blobness (no blobness → 0.663)
 - [x] **check**: 30 epochs +0.01 (noise) · TRAIN AUC 1.000 vs VAL 0.988 → keep 10 epochs
 - [x] **4 · TEST**: HUSH 0.823 [0.767–0.868] vs R2 0.797 · occlusion hit 100%, conc 0.91
-- [x] **5 · ship (built)**: `predict.py`, Gradio `app/app.py`, README results, `docs/REALITY_CHECK.md`, `docs/figures/` (PPT), `docs/RELEASE_v1.0.md`
-- [ ] **5 · ship (to do by you)**: `bash tools/phase5.sh` (**Mac only**, reads 2 files from the server) → commit → PR → merge → tag `v1.0` → GitHub Release
+- [x] **5 · ship**: `predict.py`, Gradio `app/app.py`, README results, `docs/REALITY_CHECK.md`, `docs/figures/` (PPT), `docs/RELEASE_v1.0.md`; merged, tag `v1.0`
 
 ## Open items carried forward
-- Candidate size cap must be **≥ 50 mm** (48 GT nodules > 30 mm, max 46.8 mm) → Phase 2.
+- Candidate size cap must be **≥ 50 mm** (48 GT nodules > 30 mm, max 46.8 mm) → done in Phase 2 (LoG sigmas up to ~45 mm).
 - **5 broken masks** (0619, 0697, 0403, 0523, 0655): report their candidate counts separately in Phase 2.
 - Recall ceiling **99.6%** (5 GT nodules outside the mask).
 - Server results: `/scratch/mtech_shrinkhal/lungdet_results/` → Mac with `bash tools/pull_results.sh`.
