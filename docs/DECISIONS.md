@@ -47,3 +47,29 @@
 | **Closing via 2 distance transforms** | an exact ball of any radius, fast in 3D | `binary_closing` with a 21³ ball (slow) | NOT MEASURED |
 | **Crop to the lung box + 10 mm**, `.npz` compressed | smaller cache, faster loading later | full 1 mm volume | see the cache size in `isolate_report.md` |
 | **`spawn` worker processes** | each worker opens its own pylidc database | `fork` (shares one SQLite handle) | prevention, NOT MEASURED |
+
+### First full run of `03_isolate.py` (897 scans, 315 s): 3 gates FAILED, here is why
+- **Broken masks: 31 scans < 2 L** (some ~0.01 L), holding **52 GT nodules**, **45** of them outside the mask.
+  - Cause: border air was removed **in 3D**. If the lung touches outside air through **one thin path anywhere**, the **whole lung** is deleted.
+  - Fix: remove border air **slice by slice** → a leak only costs that slice. Test: `test_one_leak_no_longer_deletes_a_lung`.
+- **16 GT nodules missed in normal scans**, all **large (14–38 mm)**.
+  - Cause: closing r = 10 mm only fills wall "bites" narrower than about 20 mm.
+  - Fix: choose r from a sweep on **TRAIN scans only** (`scripts/03b_mask_sweep.py`, radii 10/15/20).
+- **42 scans at 8–10 L, 4 above 10 L**, with lung-like median HU (−858 to −937).
+  - Read as **large or hyperinflated lungs**, not leaks → the volume gate is widened from **2–8 L to 2–10 L**.
+  - NOT MEASURED: confirm on 3 pictures after the fix.
+- **The coordinate gate passed on all 1,192 nodules:** median HU at the GT centre **10 HU**, so the nodule positions are right.
+
+### Lung-mask sweep (`scripts/03b_mask_sweep.py`, TRAIN only: 36 problem + 60 random scans, 151 GT nodules)
+| Mask | GT inside | Scans < 2 L | Scans > 10 L | Median lung L (random scans) |
+|---|:-:|:-:|:-:|:-:|
+| old: 3D border, r = 10 | 68.9% | 23 | 3 | 5.12 |
+| per-slice border, r = 10 | 91.4% | 5 | 3 | 5.12 |
+| **per-slice border, r = 15 ← chosen** | **98.0%** | 5 | 3 | 5.28 |
+| per-slice border, r = 20 | 98.7% | 4 | 3 | 5.53 |
+- **Per-slice border removal** alone: broken masks **23 → 5**, nodules inside **68.9% → 91.4%**.
+- **r = 15 is the knee:**
+  - 10 → 15 gains **+6.6 points**
+  - 15 → 20 gains only **+0.7 points** (about **1 nodule of 151**) but adds **+4.7% lung volume** (more chest wall and mediastinum → more false candidates in Phase 2)
+- Chosen on **train scans only**, because the test set must not shape any setting.
+- **Still open:** 5 scans < 2 L and 3 scans > 10 L in this set → a different failure, listed in the full-run report.

@@ -54,3 +54,30 @@ def test_crop_box_adds_margin_and_clips():
     m[10:20, 30:45, 0:5] = True
     lo, hi = crop_box(m, margin=10)
     assert tuple(lo) == (0, 20, 0) and tuple(hi) == (30, 50, 15)
+
+
+def test_one_leak_no_longer_deletes_a_lung():
+    """The Phase 1 failure: a thin air path from outside into the left lung on ONE slice (k = 40).
+    (k = 40 is above the wall nodule, which spans k = 24..36 and would block the path.)"""
+    hu = _phantom()
+    hu[60, 0:20, 40] = -1000.0                                   # leak through the body wall into the lung
+    old = lung_mask(hu, closing_radius_mm=0, per_slice_border=False)
+    new = lung_mask(hu, closing_radius_mm=0, per_slice_border=True)
+    assert not old[60, 28, 25]                                   # 3D rule: whole left lung gone
+    assert new[60, 28, 25]                                       # per-slice rule: lung kept
+    assert new[60, 92, 25]
+
+
+def test_tissue_like_padding_becomes_air():
+    """Padding of 0 HU outside a round field of view seals the outside air; the fix reopens it."""
+    from lungdet.isolate.padding import padding_to_air
+    hu = _phantom()
+    i, j = np.ogrid[0:120, 0:120]
+    outside_fov = ((i - 60) ** 2 + (j - 60) ** 2) > 58 ** 2        # r = 58: the circle must not reach row/col 119
+    hu[outside_fov] = 0.0                                          # tissue-like padding in the corners
+    broken = lung_mask(hu, closing_radius_mm=10)
+    fixed_vol, pad = padding_to_air(hu)
+    fixed = lung_mask(fixed_vol, closing_radius_mm=10)
+    assert pad == 0.0
+    assert broken[60, 60, 30]                                      # bug: mask swallows the body
+    assert not fixed[60, 60, 30] and fixed[60, 28, 30] and fixed[60, 92, 30]

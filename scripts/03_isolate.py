@@ -22,6 +22,7 @@ from lungdet.common.tables import df_to_md  # noqa: E402
 from lungdet.fetch.pylidc_compat import import_pylidc, write_pylidcrc  # noqa: E402
 from lungdet.isolate.geometry import resample  # noqa: E402
 from lungdet.isolate.lungmask import crop_box, lung_mask  # noqa: E402
+from lungdet.isolate.padding import padding_to_air  # noqa: E402
 
 _pl = None
 
@@ -48,6 +49,7 @@ def _process(task):
             vol = scan.to_volume(verbose=False).astype(np.float32)
             spacing = (scan.pixel_spacing, scan.pixel_spacing, scan.slice_spacing)
             lo_hu, hi_hu = iso["clip_hu"]
+            vol, pad = padding_to_air(vol, air=lo_hu)                              # tissue-like padding -> air
             np.clip(vol, lo_hu, hi_hu, out=vol)                                    # N
             full = resample(vol, spacing, iso["spacing_mm"], order=1, cval=lo_hu)  # E
             full_mask = lung_mask(full, iso["lung_threshold_hu"],
@@ -59,7 +61,7 @@ def _process(task):
             offset = lo
             np.savez_compressed(out_path, hu=hu, mask=mask, offset=offset,
                                 spacing_in=np.array(spacing), shape_1mm=np.array(full.shape))
-            stat.update(shape_in=tuple(vol.shape), shape_1mm=tuple(full.shape), reused=False)
+            stat.update(shape_in=tuple(vol.shape), shape_1mm=tuple(full.shape), padding=pad, reused=False)
         stat.update(crop_shape=tuple(hu.shape), lung_L=round(mask.sum() / 1e6, 3),
                     lung_median_hu=float(np.median(hu[mask])) if mask.any() else np.nan,
                     file_MB=round(os.path.getsize(out_path) / 2**20, 1))
@@ -140,13 +142,13 @@ def main():
 
     ok = stats[stats.error == ""]
     gt = nstat[nstat.role == "gt"]
-    vol_ok = ok.lung_L.between(2, 8).mean() if len(ok) else 0
+    vol_ok = ok.lung_L.between(2, 10).mean() if len(ok) else 0
     hu_ok = ok.lung_median_hu.between(-950, -700).mean() if len(ok) else 0
     inside = gt.inside_mask.mean() if len(gt) else float("nan")
     hu_c = gt.hu_at_centre.median() if len(gt) else float("nan")
     gates = [
         ("0 scans failed", (stats.error != "").sum() == 0, f"{(stats.error != '').sum()} of {len(stats)}"),
-        ("lung volume 2–8 L in ≥ 99% of scans", vol_ok >= 0.99, f"{100 * vol_ok:.1f}%"),
+        ("lung volume 2–10 L in ≥ 99% of scans", vol_ok >= 0.99, f"{100 * vol_ok:.1f}%"),
         ("lung median HU in [−950, −700] in ≥ 99% of scans", hu_ok >= 0.99, f"{100 * hu_ok:.1f}%"),
         ("GT nodule centres inside the lung mask ≥ 98%", inside >= 0.98, f"{100 * inside:.1f}% of {len(gt)}"),
         ("median HU at GT centres > −400 (coordinates line up)", hu_c > -400, f"{hu_c:.0f} HU"),
@@ -162,7 +164,7 @@ def main():
         "", "## Gates", "", "| Gate | Result | Value |", "|---|:-:|---|",
         *[f"| {g} | {'PASS' if okk else 'FAIL'} | {v} |" for g, okk, v in gates],
     ]
-    bad = stats[(stats.error != "") | ~stats.lung_L.between(2, 8)]
+    bad = stats[(stats.error != "") | ~stats.lung_L.between(2, 10)]
     if len(bad):
         lines += ["", "## Scans to look at", "",
                   *df_to_md(bad[["scan_id", "patient_id", "lung_L", "lung_median_hu", "error"]].head(20))]

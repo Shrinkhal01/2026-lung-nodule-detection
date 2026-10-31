@@ -6,8 +6,10 @@ paths:
   cache: $SCRATCH/cache_lungdet      # Phase 1: HU, 1 mm, lung mask per scan
   candidates: $SCRATCH/candidates    # Phase 2-3: candidates.csv + 32 mm cubes
   checkpoints: $SCRATCH/checkpoints  # Phase 3: .pth files (never in git)
-  results: results                   # small outputs, inside the repo
-  tables: results/phase1             # scans.csv, nodules.csv (small, synced to the Mac)
+  # Server scripts write OUTSIDE the git clone, so 'git pull' on the server never collides with results.
+  # tools/pull_results.sh copies them into the repo's results/ on the Mac, where they are committed.
+  results: $SCRATCH/lungdet_results
+  tables: $SCRATCH/lungdet_results/phase1   # scans.csv, nodules.csv, reports, QC pictures
 
 ground_truth:                        # LUNA16 rule
   max_slice_thickness_mm: 2.5
@@ -18,7 +20,7 @@ isolate:
   spacing_mm: 1.0
   clip_hu: [-1000, 1000]             # removes the -2048 padding; calcified nodules stay visible
   lung_threshold_hu: -320            # starting value, checked in Phase 1
-  closing_radius_mm: 10              # pulls wall-attached nodules into the mask (gate: >= 98% inside)
+  closing_radius_mm: 15              # chosen by scripts/03b_mask_sweep.py on TRAIN scans (10 -> 91.4%, 15 -> 98.0%, 20 -> 98.7% inside)
   keep_ratio: 0.1                    # 2nd blob kept only if >= 10% of the biggest
   crop_margin_mm: 10
   workers: 32
