@@ -134,3 +134,13 @@
 | **R3 = focal loss + hard negatives + rot90 + 8-flip TTA** | each "advanced" trick in one rung vs R2 | separate rungs per trick | 2-day budget |
 | **R4 fusion cross-fitted on VAL** (5 folds by patient) | the fusion never scores a candidate it was fitted on | fit and score on the same val | prevention |
 | **5 seeds** for R2 and R3 | one run moves by chance (v2 lesson) | 1 seed | v2: ±0.01 AUC between runs |
+
+### Phase 3 result (VAL, 134 scans, 147 GT nodules)
+| Rung | CPM | 5 seeds | Verdict |
+|---|:-:|:-:|---|
+| R0 | 0.088 | — | floor |
+| R1 XGBoost | 0.275 | — | > R0 |
+| **R2 3D CNN** | **0.778** | 0.760 ± 0.013 | best single model |
+| R3 + focal + hard negatives + rot90 + TTA | 0.717 | 0.711 ± 0.010 | **worse than R2** (ranges don't overlap) |
+| R4 = R2 + R1 fused (cross-fitted) | 0.780 | — | tie with R2 (+0.002 < 1 SD) |
+- **Lesson:** never bundle changes into one rung. HUSH adds **one change per rung**, starting from R2's recipe.
