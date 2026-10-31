@@ -1,0 +1,30 @@
+{
+  "scan": "data/phase5_local/1.3.6.1.4.1.14519.5.2.1.6279.6001.693480911433291675609148051914.npz",
+  "device": "cpu",
+  "ensemble_members": 5,
+  "measured_setup": true,
+  "threshold": 0.985733,
+  "threshold_source": "VAL operating point 1 FP/scan (VAL sensitivity 0.823)",
+  "candidates_scored": 2522,
+  "findings": 3,
+  "lung_litres": 4.95,
+  "lung_median_hu": -839.0,
+  "timings_s": {
+    "isolate_s": 0.2,
+    "nominate_s": 15.3,
+    "discard_s": 2524.7
+  },
+  "total_s": 2578.5,
+  "env": {
+    "python": "3.13.5",
+    "os": "macOS-27.2-arm64-arm-64bit-Mach-O",
+    "device": "cpu",
+    "numpy": "2.2.6",
+    "scipy": "1.18.1",
+    "pandas": "2.2.3",
+    "torch": "2.14.1",
+    "pydicom": "3.0.2",
+    "gradio": "6.31.0",
+    "matplotlib": "3.10.3"
+  }
+}

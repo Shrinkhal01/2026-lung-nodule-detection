@@ -1,0 +1,10 @@
+# CPU-safe set for predict.py and the tests. Tested: Python 3.13, torch 2.14-2.15, numpy 2.5, scipy 1.18, pandas 3.0.
+numpy>=2.0
+scipy>=1.11
+pandas>=2.2
+pyyaml>=6.0
+matplotlib>=3.8
+pydicom>=3.0        # only needed to read a DICOM folder (a cached .npz works without it)
+torch>=2.4          # CPU build is fine: pip install torch --index-url https://download.pytorch.org/whl/cpu
+pyarrow>=15         # scripts that read parquet
+pytest>=8           # tests

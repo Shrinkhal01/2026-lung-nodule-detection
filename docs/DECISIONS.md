@@ -185,3 +185,35 @@
 - **R5 (HUSH) CPM 0.823 [0.767–0.868]** · R2 0.797 [0.725–0.847] · R0 0.058 · ceiling 0.969.
 - **R5 − R2 +0.026 [+0.001, +0.078]** → small, weakly supported.
 - Occlusion (40 nodules): **hit 100%**, **concentration 0.91**; random weights: 0% and 0.00.
+
+## Phase 5: ship (SHIP)
+| Used | Why | Rejected alternative | Number that justified it |
+|---|---|---|---|
+| **One shipping module (`src/lungdet/ship/pipeline.py`) that calls the existing Phase 1–3 functions** | TEST numbers came from them; copies drift | a separate fast inference path | test: planted phantom nodule is the **rank-1 candidate, 0 mm away** |
+| **Operating points from VAL**: threshold = the (⌊rate × n_scans⌋ + 1)-th strongest false candidate; keep `prob > threshold` | TEST opened once | thresholds from TEST | `tests/test_ship.py::test_threshold_picking`; real values **NOT MEASURED until you run `tools/phase5.sh` (Mac)** |
+| **Merge within max(3 mm, √3 σ), strongest first** | one row per nodule | no merge | **NOT MEASURED on TEST** (listed as a limit) |
+| **`device.py`: CUDA → MPS → CPU, `FORCE_CPU=1`** | runs on a laptop and the H200 server | GPU required | 41 tests pass on CPU in 16 s |
+| **pydicom optional, clear error if missing** | `.npz` path works without it | hard dependency | 8 of 10 ship tests run without torch and pydicom |
+| **Occlusion `batch` argument (512 GPU / 16 CPU)** | CPU run was **killed** at 512 | keep 512 | exit 137 → works at 16; Phase 4 callers unchanged (default 512) |
+| **Phase 5 runs on the Mac**: `tools/phase5.sh` rsyncs `val_meta.parquet` + ONE scan cache; Gradio on localhost; no SHAP bars | college GPU is shared (no jobs/tmux); final model is the CNN ensemble (R1 XGBoost VAL CPM 0.275) | run on the server; public Gradio link | gradio 6.31.0 built + callbacks run headless; 2 rsync reads |
+| **Figures from result files; FROC from the 7 measured points** | saved FROC CSV is a 500-point sample out to 2,650 FP/scan | plot the CSV | 2nd CSV point is already at 3.4 FP/scan |
+| **Weights as Release assets (R5 × 5 seeds, R2 × 5 optional)** | `.gitignore` blocks `*.pth` | commit / LFS | 14.09 MB per file |
+| **Reality-check doc with Wilson + bootstrap CIs, 10 failures, 10 questions** | no number without a source | one headline number | `docs/REALITY_CHECK.md` |
+
+### Pipeline as per the code on branch `phase-5-ship` (answer key, uncommitted; commit after `c1c7651`)
+1. **Environment check**: `scripts/00_check_env.py:main` → `check_packages`, `check_gpu`, `check_disk`.
+2. **Settings**: `configs/default.yaml` → `src/lungdet/common/config.py:load_config` (expands `$SCRATCH`); new `ship:` block.
+3. **Download**: inline `idc-index` in tmux; resume/check `scripts/01_fetch.py:main` → `fetch/inventory.py:scan_series_folders`.
+4. **Ground truth + split**: `scripts/02_ground_truth.py` → `fetch/ground_truth.py:summarise_cluster` (≥ 3 readers, ≥ 3 mm), `assign_splits` (patient, 70/15/15, seed 42).
+5. **Isolate**: `scripts/03_isolate.py:_process` → `isolate/padding.py:padding_to_air` → clip → `isolate/geometry.py:resample` (1 mm) → `isolate/lungmask.py:lung_mask` (TRACE, r = 15) → `crop_box` → `.npz` cache.
+6. **Nominate**: `scripts/04_nominate.py:_scan` → `nominate/blobs.py:log_peaks` → `bundle(mode="blob")` → per-size top-1200 (`scale_rank < 1200`) → `candidates.parquet`.
+7. **Cubes**: `scripts/05_build_patches.py` → `discard/patches.py:crop_cubes` (32 mm, centre at index 16).
+8. **Train**: `scripts/06_train_cnn.py` (R2/R5, 5 seeds) → `discard/cnn.py:Small3DNet`; H channels `discard/hessian.py:hessian_channels`; XGBoost `scripts/06b_xgb.py`; masked pretraining `scripts/08_pretrain_hush.py` (not shipped).
+9. **VAL summary + length check**: `scripts/06c_summarize.py`, `06d_summarize_hush.py`, `09_check_summary.py` → `results/check/final_choice.json`.
+10. **Test once**: `tools/phase4.sh` (marker `TEST_OPENED`) → `scripts/10_score_test.py` → `discard/models.py:model_specs`, `load_ensemble`, `ensemble_predict`.
+11. **Numbers**: `scripts/10b_test_report.py` → `rate/bootstrap.py:per_scan_tables`, `bootstrap_cpm`, `ci`; `rate/froc.py:cpm_from_scores`; `rate/matching.py:match`.
+12. **Explain**: `scripts/11_explain.py` → `explain/occlusion.py:occlusion_map`, `score_map`, `rank_corr`.
+13. **Operating points (new)**: `scripts/12_operating_points.py` → `ship/operating.py:operating_points` → `results/phase5/operating_points.json`.
+14. **Ship one scan (new)**: `predict.py:main` → `ship/pipeline.py:run_scan` = `load_scan` (`fetch/dicom_io.py:load_dicom_series` or `.npz`) → `prepare` (step 5) → `nominate` (step 6) → `load_models` + `score` (steps 7–10 code) → `finalise` = `threshold_for` + `merge` → `findings.csv`, `plots.py:plot_overview`, `explain_one`.
+15. **Demo (new)**: `app/app.py:build` → `run`, `refilter`, `slice_fig`, `explain`.
+16. **Figures (new)**: `scripts/13_make_figures.py` → `docs/figures/*.png`.

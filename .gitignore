@@ -37,3 +37,8 @@ venv/
 results/*_smoke/
 results/**/*.parquet
 models/
+
+# --- Phase 5 ---
+release_assets/
+predict_out/
+out/

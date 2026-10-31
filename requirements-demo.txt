@@ -1,0 +1,2 @@
+-r requirements.txt
+gradio==6.31.0      # the version the demo was built and smoke-tested with

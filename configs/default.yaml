@@ -65,3 +65,12 @@ hush:                                # Phase 3b (HUSH)
   infer_batch: 1024
 
 gpus: "1,2"                          # use 2 of the 4 shared GPUs (fair use); GPU 0 stays free for others
+
+ship:                                # Phase 5 (S): predict.py + Gradio demo
+  model_rung: r5                     # HUSH ensemble = the model that was opened on TEST (final_choice.json)
+  seeds: [42, 43, 44, 45, 46]
+  per_size_top: 1200                 # Phase 2 choice (results/phase2/nominate_choice.json): per-size top-1200
+  default_fp_per_scan: 1             # operating point used when --fp-per-scan is not given
+  merge_min_mm: 3.0                  # detections closer than max(this, sqrt(3)*sigma) become ONE finding (NOT part of the TEST numbers)
+  cpu_batch: 64                      # cubes per forward pass on CPU (8 GB Mac); GPUs use hush.infer_batch
+  operating_points: results/phase5/operating_points.json   # thresholds picked on VAL by scripts/12_operating_points.py
