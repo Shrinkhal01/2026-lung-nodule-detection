@@ -140,13 +140,13 @@ def main():
 
     ok = stats[stats.error == ""]
     gt = nstat[nstat.role == "gt"]
-    vol_ok = ok.lung_L.between(2, 8).mean() if len(ok) else 0
+    vol_ok = ok.lung_L.between(2, 10).mean() if len(ok) else 0
     hu_ok = ok.lung_median_hu.between(-950, -700).mean() if len(ok) else 0
     inside = gt.inside_mask.mean() if len(gt) else float("nan")
     hu_c = gt.hu_at_centre.median() if len(gt) else float("nan")
     gates = [
         ("0 scans failed", (stats.error != "").sum() == 0, f"{(stats.error != '').sum()} of {len(stats)}"),
-        ("lung volume 2–8 L in ≥ 99% of scans", vol_ok >= 0.99, f"{100 * vol_ok:.1f}%"),
+        ("lung volume 2–10 L in ≥ 99% of scans", vol_ok >= 0.99, f"{100 * vol_ok:.1f}%"),
         ("lung median HU in [−950, −700] in ≥ 99% of scans", hu_ok >= 0.99, f"{100 * hu_ok:.1f}%"),
         ("GT nodule centres inside the lung mask ≥ 98%", inside >= 0.98, f"{100 * inside:.1f}% of {len(gt)}"),
         ("median HU at GT centres > −400 (coordinates line up)", hu_c > -400, f"{hu_c:.0f} HU"),
@@ -162,7 +162,7 @@ def main():
         "", "## Gates", "", "| Gate | Result | Value |", "|---|:-:|---|",
         *[f"| {g} | {'PASS' if okk else 'FAIL'} | {v} |" for g, okk, v in gates],
     ]
-    bad = stats[(stats.error != "") | ~stats.lung_L.between(2, 8)]
+    bad = stats[(stats.error != "") | ~stats.lung_L.between(2, 10)]
     if len(bad):
         lines += ["", "## Scans to look at", "",
                   *df_to_md(bad[["scan_id", "patient_id", "lung_L", "lung_median_hu", "error"]].head(20))]

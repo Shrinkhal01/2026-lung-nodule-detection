@@ -2,25 +2,45 @@
 
 T-R-A-C-E:
   Threshold  air-like voxels (HU < -320)
-  Remove     air blobs touching the in-plane border (air outside the body, scanner padding)
-  Accept     the 2 biggest remaining blobs (the lungs), if each is >= 10% of the biggest
+  Remove     air touching the image border, SLICE BY SLICE (air outside the body, scanner padding)
+  Accept     the 2 biggest remaining 3D blobs (the lungs), if each is >= 10% of the biggest
   Close      with a ball of radius r mm (pulls in nodules stuck to the lung wall)
   Eat holes  slice by slice (vessels and nodules inside the lung become part of the mask)
+
+Why "slice by slice" in R (Phase 1 finding): removing border air in 3D deleted the WHOLE lung in
+31 of 897 scans, because the lung touched outside air somewhere through one thin path.
+Per slice, such a leak only costs that one slice.
 """
 import numpy as np
 from scipy import ndimage
 
 
-def lung_mask(hu, threshold=-320.0, closing_radius_mm=10.0, keep_ratio=0.1):
-    air = hu < threshold
+def remove_border_air(air, per_slice=True):
+    """Drop air components that touch the in-plane image border."""
+    air = air.copy()
+    if per_slice:
+        for k in range(air.shape[2]):
+            sl = air[:, :, k]
+            if not sl.any():
+                continue
+            lab, n = ndimage.label(sl)
+            edge = np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]]))
+            edge = edge[edge > 0]
+            if len(edge):
+                sl[np.isin(lab, edge)] = False
+        return air
+    lab, _ = ndimage.label(air)
+    edge = np.unique(np.concatenate([lab[0].ravel(), lab[-1].ravel(), lab[:, 0].ravel(), lab[:, -1].ravel()]))
+    return air & ~np.isin(lab, edge[edge > 0])
+
+
+def lung_mask(hu, threshold=-320.0, closing_radius_mm=10.0, keep_ratio=0.1, per_slice_border=True):
+    air = remove_border_air(hu < threshold, per_slice=per_slice_border)
     lab, n = ndimage.label(air)
     if n == 0:
         return np.zeros(hu.shape, dtype=bool)
-    border = np.unique(np.concatenate([lab[0].ravel(), lab[-1].ravel(),
-                                       lab[:, 0].ravel(), lab[:, -1].ravel()]))
     sizes = np.bincount(lab.ravel())
     sizes[0] = 0
-    sizes[border] = 0
     order = np.argsort(sizes)[::-1]
     keep = [l for l in order[:2] if sizes[l] > 0 and sizes[l] >= keep_ratio * sizes[order[0]]]
     mask = np.isin(lab, keep)

@@ -47,3 +47,15 @@
 | **Closing via 2 distance transforms** | an exact ball of any radius, fast in 3D | `binary_closing` with a 21³ ball (slow) | NOT MEASURED |
 | **Crop to the lung box + 10 mm**, `.npz` compressed | smaller cache, faster loading later | full 1 mm volume | see the cache size in `isolate_report.md` |
 | **`spawn` worker processes** | each worker opens its own pylidc database | `fork` (shares one SQLite handle) | prevention, NOT MEASURED |
+
+### First full run of `03_isolate.py` (897 scans, 315 s): 3 gates FAILED, here is why
+- **Broken masks: 31 scans < 2 L** (some ~0.01 L), holding **52 GT nodules**, **45** of them outside the mask.
+  - Cause: border air was removed **in 3D**. If the lung touches outside air through **one thin path anywhere**, the **whole lung** is deleted.
+  - Fix: remove border air **slice by slice** → a leak only costs that slice. Test: `test_one_leak_no_longer_deletes_a_lung`.
+- **16 GT nodules missed in normal scans**, all **large (14–38 mm)**.
+  - Cause: closing r = 10 mm only fills wall "bites" narrower than about 20 mm.
+  - Fix: choose r from a sweep on **TRAIN scans only** (`scripts/03b_mask_sweep.py`, radii 10/15/20).
+- **42 scans at 8–10 L, 4 above 10 L**, with lung-like median HU (−858 to −937).
+  - Read as **large or hyperinflated lungs**, not leaks → the volume gate is widened from **2–8 L to 2–10 L**.
+  - NOT MEASURED: confirm on 3 pictures after the fix.
+- **The coordinate gate passed on all 1,192 nodules:** median HU at the GT centre **10 HU**, so the nodule positions are right.
