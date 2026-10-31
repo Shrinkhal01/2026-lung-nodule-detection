@@ -42,3 +42,6 @@ models/
 release_assets/
 predict_out/
 out/
+
+# --- presentation material (deck, transcript, video): local only ---
+presentation/
