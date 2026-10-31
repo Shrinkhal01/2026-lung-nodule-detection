@@ -73,3 +73,22 @@
   - 15 → 20 gains only **+0.7 points** (about **1 nodule of 151**) but adds **+4.7% lung volume** (more chest wall and mediastinum → more false candidates in Phase 2)
 - Chosen on **train scans only**, because the test set must not shape any setting.
 - **Still open:** 5 scans < 2 L and 3 scans > 10 L in this set → a different failure, listed in the full-run report.
+
+### Full rerun with r = 15 (897 scans, 306 s, 64 workers)
+- GT nodules inside the mask: **99.6%** (5 of 1,192 outside: 14.4, 23.6, 24.0, 30.0, 31.3 mm, all wall-attached) → **PASS**.
+- Coordinates: median HU at GT centres **11 HU** → **PASS**.
+- Sanity ranges: lung 2–10 L in **98.7%**, median HU −950..−700 in **98.9%** (target 99%) → **20 outlier scans**, listed in `results/phase1/qc_outliers.md`.
+
+### The 20 outliers, checked by eye (`scripts/03c_qc_outliers.py`)
+- **15 look like real anatomy:**
+  - very large, over-inflated lungs: 10.0–11.3 L, HU down to −961
+  - small, dense lungs: 1.5–2.8 L, HU −560 to −760
+  - their masks stay 19–98 mm away from the image edge
+- **5 masks include body or outside air:** LIDC-IDRI-**0619, 0697, 0403, 0523, 0655**.
+- **Hypothesis "tissue-like scanner padding" → FALSE.** `scripts/03d_padding_check.py` shows a padding of **−3024** (air-like) or none, and the fix changed **nothing** (6.49 → 6.49 L, etc.).
+  - `padding_to_air` stays in as a tested guard. It only acts on non-air padding, which none of these scans have.
+- **Decision: accept and name the 5**, not fix them now, because:
+  - the mask is only the **search region**
+  - a mask that is **too big** adds false candidates that Phase 3 can reject; it does **not** lose nodules
+  - the number that matters, **nodules inside = 99.6%**, already passes
+  - Phase 2 reports their candidate counts separately; if they dominate the false alarms, we come back to them
