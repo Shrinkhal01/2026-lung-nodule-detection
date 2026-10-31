@@ -14,16 +14,16 @@ from lungdet.discard.cnn import predict
 LUNG_HU = -850
 
 
-def occlusion_map(model, cube_i16, transform=None, block=8, stride=4, device=None):
+def occlusion_map(model, cube_i16, transform=None, block=8, stride=4, device=None, batch=512):
     """cube_i16: (32, 32, 32) int16 tensor -> (heat (32,32,32) numpy, base probability)."""
     device = device or next(model.parameters()).device
     size = cube_i16.shape[0]
     starts = list(range(0, size - block + 1, stride))
     coords = [(a, b, c) for a in starts for b in starts for c in starts]
-    batch = cube_i16.unsqueeze(0).repeat(len(coords) + 1, 1, 1, 1).clone()
+    batch_cubes = cube_i16.unsqueeze(0).repeat(len(coords) + 1, 1, 1, 1).clone()
     for n, (a, b, c) in enumerate(coords, 1):
-        batch[n, a:a + block, b:b + block, c:c + block] = LUNG_HU
-    p = predict(model, batch.to(device), batch=512, transform=transform, device=device)
+        batch_cubes[n, a:a + block, b:b + block, c:c + block] = LUNG_HU
+    p = predict(model, batch_cubes.to(device), batch=batch, transform=transform, device=device)
     base, drops = p[0], p[0] - p[1:]
     heat = np.zeros((size,) * 3, np.float32)
     count = np.zeros((size,) * 3, np.float32)

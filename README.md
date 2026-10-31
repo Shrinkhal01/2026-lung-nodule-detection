@@ -1,225 +1,183 @@
 # Lung Nodule Detection: a Hybrid, Explainable 3D Pipeline on LIDC-IDRI
 
-> **Status:** Phase 0 (setup) · started Sat 31 Oct 2026
-> Every number marked **TBD** is measured in a later phase. **Nothing in this file is a result yet.**
-> Research prototype, **not a medical device**.
+> **v1.0 · research prototype, not a medical device.** Finds what **3 of 4 radiologists agreed is a nodule (≥ 3 mm)** in a full chest CT. It says nothing about cancer.
+> Every number below comes from a script in this repo; the evidence is in [`docs/REALITY_CHECK.md`](docs/REALITY_CHECK.md).
 
 ---
 
-## 0. Read this first (1 minute)
+## 0. Result in 30 seconds
 
-- **Goal:** find **lung nodules (≥ 3 mm)** anywhere in a **full chest CT scan**. For each one, say **where** it is, **how sure** we are, and **why** (a heat map).
-- **Not the goal:** malignancy (cancer or not). That was **v2** (`2026-hybrid-nodule-v2`), a separate project kept as it is.
-- **Data:** LIDC-IDRI **full CT scans** (DICOM) + **radiologist outlines** (read with `pylidc`).
-- **Hybrid:**
-  - **classical** image processing finds candidates → fast and rule-based
-  - a **3D CNN** rejects false alarms → it sees 3D shape
-  - a **feature model** (XGBoost) gives a second opinion
-  - the two scores are **fused**
-- **Explainable:**
-  - every detection gets an **occlusion heat map**
-  - the feature model gets **SHAP** bars
-  - heat maps are **scored**, never just shown
-- **Honest:** FROC + CPM with **95% CIs**, **test set opened once**, every baseline reported.
+- **TEST CPM 0.823** (95% CI **0.767–0.868**) on **135 unseen scans / 225 nodules**, test set **opened once**.
+- At **1 false alarm per scan** → **83.6%** of nodules found. At **4** → **90.2%**.
+- **No learning (blob strength only): CPM 0.058** → the CNN is doing the work.
+- **HUSH (R5) vs a plain 3D CNN (R2): +0.026, CI +0.001 to +0.078** → small, **weakly supported** (on VAL they tied).
+- **Weak spot:** **3–6 mm** nodules → only **63%** found at 1 false alarm per scan (17 of 27).
+- **Ceiling:** the blob detector reaches **96.9%** of nodules; no later stage can beat that.
 
-🖼 **Mental image: minesweeping.** A **metal detector** beeps at everything (candidates) → a **sniffer dog** checks each beep (3D CNN) → the team **photographs why** each spot was flagged (heat map).
+![FROC on TEST](docs/figures/fig3_froc_test.png)
+
+| Model (TEST) | CPM | 95% CI | sens @ 1/8 FP | @ 1 FP | @ 4 FP |
+|---|:-:|:-:|:-:|:-:|:-:|
+| R0 · no learning | 0.058 | 0.031–0.094 | 0.044 | 0.053 | 0.062 |
+| R2 · 3D CNN, 5 seeds | 0.797 | 0.725–0.847 | 0.591 | 0.831 | 0.884 |
+| **R5 · HUSH, 5 seeds (shipped)** | **0.823** | **0.767–0.868** | **0.702** | **0.836** | **0.902** |
+
+**CPM** = mean sensitivity at 1/8, 1/4, 1/2, 1, 2, 4, 8 false alarms per scan. **CI** = 1,000 bootstrap resamples of *scans* (not candidates, because candidates of one scan are not independent).
 
 ---
 
-## 1. The pipeline: **FINDERS**
+## 1. Quickstart (3 commands)
 
-```mermaid
-flowchart LR
-  F["F · Fetch<br/>LIDC CT + pylidc marks"] --> I["I · Isolate<br/>HU, 1 mm, lung mask"]
-  I --> N["N · Nominate<br/>classical candidates"]
-  N --> D["D · Discard<br/>3D CNN + XGBoost, fused"]
-  D --> E["E · Explain<br/>occlusion + SHAP"]
-  D --> R["R · Rate<br/>FROC, CPM, 95% CI"]
-  E --> S["S · Ship<br/>predict.py + Gradio"]
-  R --> S
+```bash
+pip install -r requirements.txt                         # CPU is fine; add requirements-demo.txt for the Gradio app
+# get the weights (14 MB x 5) from the GitHub Release into ./models/
+gh release download v1.0 -p "lungdet-v1.0-hush-r5-weights.zip" && unzip lungdet-v1.0-hush-r5-weights.zip -d models
+python predict.py /path/to/dicom_folder --fp-per-scan 1 --out out/     # -> out/findings.csv, findings.png, summary.json
 ```
 
-| | Layer | What it does | Because | Output |
+- **Input:** a folder of DICOM slices (needs `pydicom`), or a cached `.npz` from `scripts/03_isolate.py`.
+- **Output:** one row per finding (rank, probability, size estimate, voxel coordinates in the original scan) + a picture.
+- **`--fp-per-scan`** picks the operating point (1/8 … 8). Thresholds are picked on **VAL**, never on TEST.
+- **`--explain 3`** adds occlusion maps (where the model looked) for the top 3 findings.
+- **Speed (measured):** one real scan (LIDC-IDRI-0405) on a **MacBook CPU (Apple Silicon, 8 GB)** took **2,578 s ≈ 43 min** with the full 5-model ensemble (2,522 candidates; 2,525 s of that was scoring, i.e. about 0.2 s per cube per model). A GPU should take seconds (not measured). `--models 1` is about 5× faster but **not the measured setup**.
+- **Memory:** the lung mask uses distance transforms on the full 1 mm volume → plan **8–16 GB RAM** for a raw DICOM chest. A cached `.npz` (already isolated) needs far less.
+- **Demo:** `pip install -r requirements-demo.txt && FORCE_CPU=1 python app/app.py`, open http://localhost:7860 and type the path of a `.npz` or DICOM folder (see [`app/README.md`](app/README.md)).
+
+---
+
+## 2. The pipeline: **FINDERS**
+
+![Pipeline](docs/figures/fig1_pipeline.png)
+
+| | Layer | What it does | Because | Where |
 |:-:|---|---|---|---|
-| **F** | Fetch | download CT scans with `idc-index` to `/scratch`; read radiologist marks with `pylidc` | public bucket, no login; the marks ship inside pylidc's local database | `lidc_raw/`, `nodules.csv` |
-| **I** | Isolate | stored value → **HU** → **1 mm voxels** → **lung mask** | every scan must use the **same ruler**; nodules live **inside** the lungs | `cache/<series>.npz` |
-| **N** | Nominate | threshold + connected blobs of 3–30 mm inside the mask | **high recall**, no training, every rule can be explained | `candidates.csv` |
-| **D** | Discard | 3D CNN on **32 mm cubes** + XGBoost on candidate features, fused | a vessel and a nodule look alike in one slice but differ in **3D shape** | `scores.csv`, checkpoints |
-| **E** | Explain | occlusion maps (CNN), SHAP (XGBoost), a random-weights sanity check | "why is this beep a nodule?" | `results/explain/` |
-| **R** | Rate | FROC, CPM, bootstrap 95% CI, ablation table | one number **plus** its uncertainty | `results/` |
-| **S** | Ship | `predict.py` (scan in → nodules out), Gradio app, docs | a demo and a defendable write-up | `app/`, `docs/` |
+| **F** | Fetch | LIDC-IDRI scans via `idc-index`; radiologist marks via `pylidc` | public bucket, no login | `scripts/01_fetch.py`, `02_ground_truth.py` |
+| **I** | Isolate | HU → clip → **1 mm voxels** → **lung mask** (TRACE) → crop | one ruler for every scan; nodules live inside lungs | `scripts/03_isolate.py`, `isolate/` |
+| **N** | Nominate | **LoG blob detector** at 7 sizes, per-size top-1,200 | balls beat vessels (tubes) and walls (sheets); high recall, no training | `scripts/04_nominate.py`, `nominate/` |
+| **D** | Discard | **3D CNN** on 32 mm cubes with 3 channels [HU, **blobness**, **vesselness**]; **5-seed ensemble** | a vessel and a nodule look alike in one slice but differ in 3D shape | `scripts/06_train_cnn.py`, `discard/` |
+| **E** | Explain | **occlusion maps**, scored, with a random-weights sanity check | "why is this beep a nodule?" | `scripts/11_explain.py`, `explain/` |
+| **R** | Rate | FROC, CPM, bootstrap CI, size breakdown | a number **plus** its uncertainty | `scripts/10b_test_report.py`, `rate/` |
+| **S** | Ship | `predict.py`, Gradio app, docs, figures | a demo and a defendable write-up | `predict.py`, `app/`, `src/lungdet/ship/` |
+
+🖼 **Mental image: minesweeping.** A **metal detector** beeps at everything (20,860 peaks per scan → 2,643 kept) → a **sniffer dog** checks each beep (3D CNN) → the team **photographs why** (occlusion map).
+
+![Funnel](docs/figures/fig7_funnel.png)
 
 ---
 
-## 2. Ground truth: what counts as a nodule
+## 3. What was tried (the staircase)
 
-- **LIDC-IDRI:** 1,010 patients, 1,018 CT scans, about **124 GB**. Up to **4 radiologists** read each scan.
-- **Rule (same as LUNA16):**
-  - keep scans with slice thickness **≤ 2.5 mm**
-  - a **nodule** = **≥ 3 mm** and marked by **≥ 3 of 4** readers
-  - LUNA16 got **888 scans / 1,186 nodules** with this rule → our Phase 1 count must land close (**gate**)
-- **Ignore zones:** marks by only 1–2 readers, marks < 3 mm, and "non-nodules".
-  - A detection there is **neither a hit nor a false alarm**, because the readers disagreed.
-- **Hit** = detection centre within the **nodule's radius**. Two detections on one nodule count once.
-- **Worked example:**
-  - nodule centre at (120, 200, 85) mm, diameter 8 mm → radius **4 mm**
-  - detection at (122, 201, 86) → distance √(2² + 1² + 1²) = √6 ≈ **2.45 mm**
-  - 2.45 < 4 → **hit**
-- ⚠ The labels are **radiologist marks**, not biopsy. The project finds what **3 of 4 readers agreed is a nodule**.
+Each rung changes **one thing** and must beat the rung below by **more than the seed-to-seed spread**.
 
----
+![Staircase on VAL](docs/figures/fig2_staircase_val.png)
 
-## 3. The score: FROC + CPM
+- **R1 XGBoost** on hand-made features: **0.275** → far below a CNN.
+- **R2 3D CNN: 0.778** (single seeds 0.760 ± 0.013) → the big jump.
+- **R3** focal loss + hard negatives + rot90 + TTA bundled together: **0.717** → **worse**, because bundled tricks hide which one hurt.
+- **R4** fuse R2 with XGBoost: 0.780 → a **tie**.
+- **R5 HUSH** = R2 + **H**essian shape channels: **0.779**, **R6** + **U** masked-cube pretraining: 0.776, **R7** + **S** size head: 0.772 → none above seed noise on VAL.
+- **R5 was shipped** because it ties R2 on VAL, scored higher on TEST (weakly), and is **explainable through its channels**. That is a choice, not a proven win.
+- **Ablation (R5, 1 seed, VAL):** blank blobness → **0.663**, blank vesselness → 0.695, HU only → **0.397** → the network leans on the shape channels.
 
-- **FROC curve:** sensitivity (y) vs **false positives per scan** (x).
-- **CPM** = mean sensitivity at **1/8, 1/4, 1/2, 1, 2, 4, 8** FP/scan.
-- **Worked example (not a result):**
-  - sensitivities 0.70, 0.78, 0.85, 0.90, 0.93, 0.95, 0.96
-  - sum = 6.07 → 6.07 ÷ 7 = **CPM 0.867**
-- **95% CI:**
-  - resample the **test patients** 1,000 times and recompute CPM each time
-  - the middle 95% of those values is the CI
-  - we resample **patients**, not candidates, because candidates from one scan are not independent
-- **Lesson from v2:** one training run moves by chance → every deep model is trained with **5 seeds**.
+![Ablation](docs/figures/fig6_ablation.png)
 
 ---
 
-## 4. "Advanced ML": the staircase of rungs
+## 4. Where it fails
 
-Each rung must beat the one below it **on validation**. The **test set is opened once**, for the final rung only.
+![Recall by size](docs/figures/fig5_recall_by_size.png)
 
-| Rung | System | Why it is there |
-|:-:|---|---|
-| **R0** | candidates ranked by a hand rule (size × density) | the floor: what you get with **no learning** |
-| **R1** | + **XGBoost** on ~20 hand-made candidate features (size, sphericity, HU statistics, distance to the lung wall) | classical ML baseline, explainable with **SHAP** |
-| **R2** | + **3D CNN** (3D ResNet-style) on 32 mm cubes | the deep model sees **3D shape** |
-| **R3** | + **hard-negative mining**, **focal loss**, **3D augmentation**, **test-time flips** | the "advanced" training tricks, each one measured |
-| **R4** | **hybrid fusion:** CNN score + XGBoost score (stacked logistic regression) + **5-seed ensemble** | does mixing help? **measured, not assumed** |
-| *stretch* | end-to-end 3D detector (MONAI RetinaNet) trained on **our** split | a modern one-network comparison |
-
-- **Class imbalance:** a scan gives about **TBD** candidates for about 1–2 real nodules.
-  - So training uses **balanced batches** and **focal loss**, because plain accuracy would reward "everything is a false alarm".
-- **No pretrained LUNA16 weights.** LUNA16 is built from LIDC, so those weights have already **seen our test scans** (leakage).
+- **3–6 mm:** 63% at 1 FP/scan, and **3 of 27** never became candidates.
+- **> 30 mm:** 3 of 5 found (too few to judge).
+- **7 of 225** test nodules (3.1%) are unreachable: the blob detector never proposed them.
+- **5 scans** have lung masks that include body or outside air (LIDC-IDRI-0619, 0697, 0403, 0523, 0655). Accepted and named, not fixed.
+- Galleries of hits, false alarms and **misses**: [`results/phase4/explain/`](results/phase4/explain/) · full catalogue: [`docs/REALITY_CHECK.md`](docs/REALITY_CHECK.md).
 
 ---
 
-## 5. Design rules carried over from v2: **PRISM**
+## 5. Ground truth and the score
 
-- **P**atient split → all scans of one patient go into one split, because shared patients **leak** and inflate scores.
+- **LIDC-IDRI:** 1,010 patients, 1,018 CT scans, ~124 GB, up to **4 radiologists** per scan.
+- **Rule (as LUNA16):** slice ≤ 2.5 mm; **nodule = ≥ 3 mm and marked by ≥ 3 of 4 readers**. We got **897 scans / 1,192 nodules**.
+- **Split by patient, 70/15/15, seed 42:** TRAIN 628 scans · VAL 134 scans / 147 nodules · **TEST 135 scans / 225 nodules**.
+- **Ignore zones:** marks by 1–2 readers, < 3 mm, or "non-nodule" are **neither hit nor false alarm**.
+- **Hit** = detection centre inside the nodule's radius; two detections on one nodule count once.
+- **Worked example:** CPM = (0.702 + 0.733 + 0.787 + 0.836 + 0.867 + 0.902 + 0.933) ÷ 7 = 5.760 ÷ 7 = **0.823**.
+- ⚠ **Labels are radiologist consensus, not biopsy.**
+
+---
+
+## 6. Design rules: **PRISM**
+
+- **P**atient split → one patient, one split, because shared patients **leak**.
 - **R**esample to 1 mm → the same physical size in every scan.
-- **I**nputs from pixels only → no radiologist ratings as inputs, because the readers also made the labels (**circular**).
-- **S**eeds ×5 + 95% CI → **test set opened once**.
-- **M**aps scored → **occlusion** first. In v2, layer4 Grad-CAM scored **worse than an untrained network**, so every heat map gets a **random-weights sanity check**.
+- **I**nputs from pixels only → no radiologist ratings as inputs, because they also made the labels (circular).
+- **S**eeds × 5 + 95% CI → **test set opened once** (`TEST_OPENED` marker; a second run refuses).
+- **M**aps scored → occlusion with a **random-weights check**, because in the earlier v2 project layer-4 Grad-CAM scored **worse than an untrained network**.
 
 ---
 
-## 6. Plan: phases and timeline (Sat 31 Oct → Sun 1 Nov 2026)
+## 7. Reproduce
 
-Each phase = **one git branch** + **one gate number** that must be verified + **notes in `docs/phases/PHASE_N.md`**.
+```bash
+# SERVER (lungenv on; data on /scratch). Every step writes to $SCRATCH/lungdet_results/
+python scripts/03_isolate.py          # 897 scans -> 1 mm cache
+python scripts/04_nominate.py         # candidates (per-size top-1200)
+bash tools/phase3.sh && bash tools/phase3b.sh && bash tools/check.sh
+bash tools/phase4.sh                  # TEST, opened once
+# MAC (nothing more runs on the server)
+bash tools/pull_results.sh            # small results
+bash tools/phase5.sh                  # thresholds per false-alarm rate (VAL only) + predict.py on one real scan
+python scripts/13_make_figures.py && python -m pytest tests/ -q
+```
 
-| Phase | FINDERS | When | Builds | Gate (must be true to move on) | Branch |
-|:-:|:-:|---|---|---|---|
-| **0** · setup | — | Sat AM | repo, env (PyTorch on GPUs 1–3), **download running in tmux**, pylidc loads 1 scan | 1 scan + its nodules load; **download speed measured** | `phase-0-setup` |
-| **1** · fetch + isolate | F, I | Sat midday | `nodules.csv`, **patient splits**, HU → 1 mm → lung mask cache | counts ≈ 888 / 1,186 (for the scans we have); air ≈ −1000 HU; **0 patients shared** | `phase-1-fetch-isolate` |
-| **2** · nominate | N | Sat PM | classical candidates + **R0** | candidate **recall on validation** (target ≥ 90%, **TBD**) and FP/scan reported | `phase-2-nominate` |
-| **3** · discard | D | Sat night → Sun AM | patch dataset, **R1–R4** trained overnight on GPUs 1–3 | validation CPM for every rung | `phase-3-discard` |
-| **4** · explain + rate | E, R | Sun midday | occlusion + sanity check, SHAP, **test once**, CIs, failure gallery | every number reruns from one script | `phase-4-explain-rate` |
-| **5** · ship | S | Sun evening | `predict.py`, **Gradio** app, final README, reality-check doc, PPT figures | a fresh scan → detections in **one command** | `phase-5-ship` |
-
-**At every phase:**
-- **Start:** a one-line **prediction** at the top of `PHASE_N.md`.
-- **End:** notes **from memory**, checked against the code, plus the **git commands** to run.
-
-**If the network is slow:**
-- pylidc's **local** database picks the scans with the **most nodules first**, so a partial download is still useful.
-- The stretch rung is dropped first.
-
----
-
-## 7. How we work: Mac + GitHub + GPU server (**WRAP**)
-
-| Where | Holds | Never holds |
-|---|---|---|
-| **Mac** (8 GB) | code, docs, tests on **fake** scans | CT data |
-| **GitHub** | code + small results | data, checkpoints |
-| **Server** `/scratch/mtech_shrinkhal/` | raw scans, cache, candidates, checkpoints, results | — |
-
-- **W**rite → Claude writes code + CPU tests in this folder on the Mac; you run `pytest`.
-- **R**elay → `git push` (Mac) → `git pull` (server).
-- **A**ct → run on the server inside **tmux**, with `CUDA_VISIBLE_DEVICES=1,2,3` (GPU 0 is shared).
-- **P**ull back → `rsync` the small `results/` to the Mac (checkpoints excluded).
-
-**Server facts:**
-- 4 × NVIDIA H200 NVL.
-- `/home` is **full** → everything big goes to `/scratch` (2.7 TB free).
-- Conda env **`lungxai`** (Python 3.11); PyTorch is installed or verified in Phase 0.
-- `~/.bashrc` sends `TMPDIR`, the pip cache and the conda pkgs cache to `/scratch`.
+- **Tests:** 41 pass on CPU in about 16 s (synthetic chest phantom, DICOM round trip, threshold maths, full chain with random weights). Without PyTorch the torch tests **skip**.
+- **Tested versions:** Python 3.13, torch 2.14–2.15, numpy 2.5, scipy 1.18, pandas 3.0, pydicom 3.0, gradio 6.31. Looser ranges are in `requirements.txt`.
+- **Tested once:** one real TEST scan (LIDC-IDRI-0405) through `predict.py` end to end on a Mac CPU: both radiologist nodules (8.4 mm) found, 1 false alarm at the 1 FP/scan point. One scan says nothing about the CPM.
+- **Not tested here:** Windows, Apple-GPU (MPS) runs, raw DICOM folders on real data.
 
 ---
 
 ## 8. Repository layout
 
-Every folder has its own `README.md` saying what goes there and in which phase.
-
 ```text
-2026-lung-nodule-detection/
-├── README.md            ← you are here: goal, pipeline, plan
-├── configs/             ← one YAML with every path and setting
-├── scripts/             ← numbered steps you run on the server (00_ … 09_)
-├── src/lungdet/         ← the library, one sub-folder per FINDERS layer
-│   ├── common/          ← device (CUDA → MPS → CPU), paths, seeds, logging
-│   ├── fetch/           ← F: idc-index download, pylidc ground truth
-│   ├── isolate/         ← I: HU, resampling, lung mask
-│   ├── nominate/        ← N: classical candidate finder
-│   ├── discard/         ← D: patches, XGBoost, 3D CNN, fusion
-│   ├── explain/         ← E: occlusion, SHAP, sanity checks
-│   └── rate/            ← R: hit matching, FROC, CPM, bootstrap CI
-├── app/                 ← S: Gradio demo
-├── tests/               ← CPU tests on synthetic scans (run on the Mac)
-├── docs/                ← plan, decisions, reality check
-│   └── phases/          ← PHASE_0.md … PHASE_5.md (your notes)
-├── results/             ← metrics + figures (checkpoints git-ignored)
-└── data/                ← README only; real data lives on /scratch
+├── predict.py           ← scan in -> findings out (the one-command gate of Phase 5)
+├── app/                 ← Gradio demo (runs on your own machine, localhost only)
+├── configs/default.yaml ← every path and setting
+├── scripts/             ← numbered steps (00_ … 13_)
+├── src/lungdet/         ← library: fetch / isolate / nominate / discard / explain / rate / ship / common
+├── tests/               ← CPU tests on synthetic scans
+├── docs/                ← PROJECT_MAP, DECISIONS, REALITY_CHECK, RELEASE_v1.0, phases/, figures/
+├── results/             ← small outputs only (metrics, figures, galleries)
+└── models/              ← git-ignored; download the weights from the Release
 ```
 
 ---
 
-## 9. Limits we already know (seeds for the reality-check doc)
+## 9. Limits (read before quoting a number)
 
-1. **Labels are radiologist marks** (≥ 3 of 4 agree), not pathology, and only nodules ≥ 3 mm.
-2. **One dataset**, no external hospital → our numbers mean "**on LIDC**", not "in clinics".
-3. The **slice-thickness rule** drops thick-slice scans → the detector is untested on them.
-4. **The candidate finder caps recall:** a nodule it misses can never be found by a later stage.
-5. A **2-day build:** v1 numbers, no large hyperparameter search.
-
----
-
-## 10. Glossary
-
-- **HU (Hounsfield unit):** CT density scale. Air ≈ −1000, lung ≈ −800, water 0, bone ≥ +400. **Stored value × slope + intercept = HU.**
-- **Voxel:** a 3D pixel. LIDC voxels are often 0.7 × 0.7 × 2.5 mm → we resample them to **1 × 1 × 1 mm**.
-- **Candidate:** a spot that **might** be a nodule (from step N).
-- **False positive (FP):** a candidate we call a nodule that isn't one.
-- **Recall / sensitivity:** share of real nodules we find.
-- **FROC / CPM:** see section 3.
-- **Occlusion map:** cover one small cube at a time and watch the score drop → **where** the model looked.
-- **SHAP:** how much each feature pushed one prediction up or down.
+1. **One dataset (LIDC-IDRI).** "On LIDC", not "in a clinic". No external hospital.
+2. **Labels are consensus marks** (≥ 3 of 4 readers, ≥ 3 mm), not pathology.
+3. **TEST is small:** 135 scans / 225 nodules → CI width about ±0.05 CPM.
+4. **Slice ≤ 2.5 mm only.** Thicker scans were dropped and are untested.
+5. **`predict.py` adds two steps TEST did not measure:** a **VAL-picked threshold** and **merging nearby detections** into one finding (TEST counted duplicates on one nodule once).
+6. **VAL was used for choices** (so VAL numbers are slightly optimistic); TEST was opened once.
+7. **The sanity check is weak:** random-weights occlusion maps are almost flat (hit 0%, concentration 0.00).
+8. **Built in about 2 days:** no large hyperparameter search.
 
 ---
 
-## 11. Data, licence, references
+## 10. Data, licence, references
 
-- **LIDC-IDRI data:** Armato SG III et al. (2015). *Data From LIDC-IDRI* [Data set]. The Cancer Imaging Archive. https://doi.org/10.7937/K9/TCIA.2015.LO9QL9SX (CC BY 3.0)
+- **LIDC-IDRI data:** Armato SG III et al. (2015), TCIA, https://doi.org/10.7937/K9/TCIA.2015.LO9QL9SX (CC BY 3.0). **No scans or checkpoints are in git.**
 - **LIDC-IDRI paper:** Armato SG III et al., *Medical Physics* 38(2):915–931, 2011.
 - **TCIA:** Clark K et al., *J Digit Imaging* 26(6):1045–1057, 2013.
 - **Download tool:** NCI Imaging Data Commons, `idc-index` (Fedorov A et al.).
 - **pylidc:** Hancock MC, Magnan JF, *J Med Imaging* 3(4):044504, 2016.
-- **LUNA16:** Setio AAA et al., *Medical Image Analysis* 42:1–13, 2017.
-- **Focal loss / RetinaNet:** Lin T-Y et al., ICCV 2017.
-- **Occlusion sensitivity:** Zeiler MD, Fergus R, ECCV 2014.
-- **SHAP:** Lundberg SM, Lee S-I, NeurIPS 2017.
-- **Sanity checks for saliency maps:** Adebayo J et al., NeurIPS 2018.
+- **LUNA16 rule + CPM:** Setio AAA et al., *Medical Image Analysis* 42:1–13, 2017.
+- **Occlusion sensitivity:** Zeiler MD, Fergus R, ECCV 2014. **Sanity checks for saliency maps:** Adebayo J et al., NeurIPS 2018.
+- **Code licence:** *not chosen yet*. Add a `LICENSE` file before others reuse the code.
 
 ## Credits
 
-Built by **Shrinkhal**, with **Claude** (Anthropic) as a coding assistant.
+Built by **Shrinkhal**, with **Claude** (Anthropic) as a coding assistant. Weights are trained on LIDC-IDRI only (no LUNA16 pretrained weights, which would have seen our test scans).

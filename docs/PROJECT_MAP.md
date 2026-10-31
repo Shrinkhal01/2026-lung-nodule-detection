@@ -1,7 +1,7 @@
 # Project map: where am I?
 
 > **Read this first** whenever you come back after a break.
-> **Now (Sat 31 Oct, 20:00):** Phases 0–4 ✅. **TEST (opened once): HUSH CPM 0.823 [0.767–0.868]**. Next: **Phase 5 · ship** on branch `phase-5-ship`.
+> **Now (Sat 31 Oct, evening):** Phases 0–4 ✅. **TEST (opened once): HUSH CPM 0.823 [0.767–0.868]**. **Phase 5 · ship** is built on branch `phase-5-ship` (code, demo, docs, figures); left: run `bash tools/phase5.sh` **on the Mac** (the server is only read by rsync), commit, PR, tag **v1.0**.
 
 ## The metro line
 ```
@@ -42,7 +42,8 @@ git cc "feat: ..."                                         # commit with Claude 
 - [x] **3b · HUSH**: R5 VAL CPM 0.779 (tie); relies on blobness (no blobness → 0.663)
 - [x] **check**: 30 epochs +0.01 (noise) · TRAIN AUC 1.000 vs VAL 0.988 → keep 10 epochs
 - [x] **4 · TEST**: HUSH 0.823 [0.767–0.868] vs R2 0.797 · occlusion hit 100%, conc 0.91
-- [ ] **5 · ship**: predict.py, Gradio, final docs
+- [x] **5 · ship (built)**: `predict.py`, Gradio `app/app.py`, README results, `docs/REALITY_CHECK.md`, `docs/figures/` (PPT), `docs/RELEASE_v1.0.md`
+- [ ] **5 · ship (to do by you)**: `bash tools/phase5.sh` (**Mac only**, reads 2 files from the server) → commit → PR → merge → tag `v1.0` → GitHub Release
 
 ## Open items carried forward
 - Candidate size cap must be **≥ 50 mm** (48 GT nodules > 30 mm, max 46.8 mm) → Phase 2.
