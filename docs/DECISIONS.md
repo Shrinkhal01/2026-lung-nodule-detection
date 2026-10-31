@@ -118,3 +118,19 @@
     - global top-N
     - **per-size top-q**, where each blob size gets its own quota, so small faint blobs don't compete with big bright ones
   - the script **picks automatically** (fewest candidates reaching 95% TRAIN recall)
+
+### Phase 2 result (`scripts/04_nominate.py`, chosen automatically on TRAIN)
+- **per-size top-1200**: TRAIN recall **96.0%** at **2,643** candidates/scan.
+  - Global top-N needs **5,000**/scan for 95.7% → per-size quotas **halve** the candidates.
+- TRAIN recall by size: 3–6 mm **84.1%**, 6–10 **95.6%**, 10–20 **98.8%**, 20–30 **98.4%**, > 30 **100%**.
+- R0 (blob strength only, no learning) VAL CPM **0.088**.
+
+## Phase 3: discard (R1–R4), one command `tools/phase3.sh`
+| Used | Why | Rejected alternative | Number that justified it |
+|---|---|---|---|
+| **TRAIN sample** per scan: positives + GT centre ×5 (jitter ±2 mm) + 150 random + 50 hardest negatives | 2,643 candidates × 628 scans = 1.66 M is too many; balance matters more than volume | all candidates | NOT MEASURED |
+| **Balanced batches** (25% positives) | positives are < 5% of candidates | plain shuffling | prevention |
+| **Small 3D CNN** (4 blocks, ~1.5 M weights) on 32 mm cubes | fast on H200; cubes are small | 3D ResNet-18 (33 M weights in v2) | NOT MEASURED |
+| **R3 = focal loss + hard negatives + rot90 + 8-flip TTA** | each "advanced" trick in one rung vs R2 | separate rungs per trick | 2-day budget |
+| **R4 fusion cross-fitted on VAL** (5 folds by patient) | the fusion never scores a candidate it was fitted on | fit and score on the same val | prevention |
+| **5 seeds** for R2 and R3 | one run moves by chance (v2 lesson) | 1 seed | v2: ±0.01 AUC between runs |
