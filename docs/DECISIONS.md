@@ -144,3 +144,14 @@
 | R3 + focal + hard negatives + rot90 + TTA | 0.717 | 0.711 ± 0.010 | **worse than R2** (ranges don't overlap) |
 | R4 = R2 + R1 fused (cross-fitted) | 0.780 | — | tie with R2 (+0.002 < 1 SD) |
 - **Lesson:** never bundle changes into one rung. HUSH adds **one change per rung**, starting from R2's recipe.
+
+## Phase 3b: HUSH (one change per rung, starting from R2 = 0.778)
+| Used | Why | Rejected alternative | Number that justified it |
+|---|---|---|---|
+| **Start from R2's recipe** (BCE, random negatives, flips) | R3's bundled tricks lost 0.05 CPM | start from R3 | R2 0.760 ± 0.013 vs R3 0.711 ± 0.010 |
+| **H: 3 input channels** [HU, blobness, vesselness], max over σ = 1, 2, 4 mm, closed-form 3×3 eigenvalues on the GPU | hand the network the vessel-vs-ball physics | let it learn curvature itself | tests: ball → blobness wins; tube → vesselness wins; eigenvalues match `torch.linalg.eigvalsh` |
+| **U: masked cube restoration**, 60% of 4³ blocks hidden, about 314k unlabelled TRAIN cubes, 6,000 steps | 6,034 labelled positives vs hundreds of thousands of unlabelled cubes | ImageNet-style transfer (2D, wrong domain) | NOT MEASURED until the R6 rung |
+| **S: size head**, log(diameter), smooth-L1, weight 0.1, positives only | forces the features to encode 3D extent | segmentation head (needs masks) | NOT MEASURED until the R7 rung |
+| **Rule: a rung earns its place** only if its 5-seed mean beats the rung below by more than the larger seed SD | avoid reading noise as progress | any increase | v2 + Phase 3 seed spreads |
+| **Explanation by ablation:** blank blobness / vesselness at test time | measures what the network relies on | heat maps only | see `phase3b_report.md` |
+| **2 GPUs + 40 GB memory cap** per process | fair use of the shared server | 3 GPUs, no cap | your choice |
