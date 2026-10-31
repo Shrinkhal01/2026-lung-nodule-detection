@@ -6,8 +6,10 @@ paths:
   cache: $SCRATCH/cache_lungdet      # Phase 1: HU, 1 mm, lung mask per scan
   candidates: $SCRATCH/candidates    # Phase 2-3: candidates.csv + 32 mm cubes
   checkpoints: $SCRATCH/checkpoints  # Phase 3: .pth files (never in git)
-  results: results                   # small outputs, inside the repo
-  tables: results/phase1             # scans.csv, nodules.csv (small, synced to the Mac)
+  # Server scripts write OUTSIDE the git clone, so 'git pull' on the server never collides with results.
+  # tools/pull_results.sh copies them into the repo's results/ on the Mac, where they are committed.
+  results: $SCRATCH/lungdet_results
+  tables: $SCRATCH/lungdet_results/phase1   # scans.csv, nodules.csv, reports, QC pictures
 
 ground_truth:                        # LUNA16 rule
   max_slice_thickness_mm: 2.5

@@ -5,5 +5,5 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 : "${LUNG_SERVER:?set LUNG_SERVER first (see the top of this file)}"
-rsync -a --exclude '*.pth' "$LUNG_SERVER:/scratch/mtech_shrinkhal/2026-lung-nodule-detection/results/" results/
+rsync -a --exclude '*.pth' "$LUNG_SERVER:/scratch/mtech_shrinkhal/lungdet_results/" results/
 echo "synced results/ from $LUNG_SERVER"
