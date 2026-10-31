@@ -13,6 +13,7 @@ EP=30; EVAL=10; TAG=""; EXTRA=""
 if [ "${SMOKE:-0}" = "1" ]; then EP=2; EVAL=1; TAG="_smoke"; EXTRA="--steps 10"; fi
 NG=${#GPU_LIST[@]}
 LOG="$SCRATCH/logs/check$TAG"; mkdir -p "$LOG"
+exec 9>"$LOG/.lock"; flock -n 9 || { echo "This run is ALREADY running in another window (see: tmux ls). Not starting a second copy."; exit 1; }
 jobs=("r2 42" "r2 43" "r5 42" "r5 43" "r2 44" "r5 44")   # balanced: R5 runs are ~2x slower than R2
 echo "== 1/2 R2 + R5, ${EP} epochs (3x longer), seeds 42-44, on GPUs ${GPU_LIST[*]}"
 for ((g=0; g<NG; g++)); do

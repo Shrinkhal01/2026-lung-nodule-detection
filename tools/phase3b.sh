@@ -15,6 +15,7 @@ TAG=""; EXTRA=""; SEEDS="42 43 44 45 46"; PRE=""
 if [ "${SMOKE:-0}" = "1" ]; then TAG="_smoke"; EXTRA="--epochs 1 --steps 20"; SEEDS="42"; PRE="--steps 20 --limit 10"; fi
 G1=${GPU_LIST[0]}
 LOG="$SCRATCH/logs/phase3b$TAG"; mkdir -p "$LOG"
+exec 9>"$LOG/.lock"; flock -n 9 || { echo "This run is ALREADY running in another window (see: tmux ls). Not starting a second copy."; exit 1; }
 
 run() {  # rung seed gpu
   CUDA_VISIBLE_DEVICES=$3 python -u scripts/06_train_cnn.py --rung "$1" --seed "$2" --tag "$TAG" $EXTRA > "$LOG/$1_$2.log" 2>&1 \

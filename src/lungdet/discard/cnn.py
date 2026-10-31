@@ -88,13 +88,16 @@ def to_unit(cubes_i16):
 
 
 @torch.no_grad()
-def predict(model, cubes_i16, batch=4096, tta=False, transform=None):
-    """cubes on the GPU as int16 -> probabilities (n,) on the CPU. transform: e.g. Hessian channels (+ ablation)."""
+def predict(model, cubes_i16, batch=4096, tta=False, transform=None, device=None):
+    """int16 cubes (on the CPU or GPU) -> probabilities (n,) on the CPU.
+    Cubes on the CPU are sent to `device` one batch at a time, so a 21.5 GB VAL set never sits on the GPU at once.
+    transform: e.g. Hessian channels (+ ablation)."""
     model.eval()
+    device = device or next(model.parameters()).device
     out = []
     flips = [()] if not tta else [(), (2,), (3,), (4,), (2, 3), (2, 4), (3, 4), (2, 3, 4)]
     for s in range(0, len(cubes_i16), batch):
-        x = to_unit(cubes_i16[s:s + batch])
+        x = to_unit(cubes_i16[s:s + batch].to(device, non_blocking=True))
         if transform is not None:
             x = transform(x)
         with torch.autocast("cuda", dtype=torch.bfloat16, enabled=x.is_cuda):

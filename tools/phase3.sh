@@ -14,6 +14,7 @@ python -m pytest tests/ -q
 TAG=""; EXTRA=""; SEEDS="42 43 44 45 46"; LIMIT=""
 if [ "${SMOKE:-0}" = "1" ]; then TAG="_smoke"; EXTRA="--epochs 1 --steps 20"; SEEDS="42"; LIMIT="--limit 10"; fi
 LOG="$SCRATCH/logs/phase3$TAG"; mkdir -p "$LOG"
+exec 9>"$LOG/.lock"; flock -n 9 || { echo "This run is ALREADY running in another window (see: tmux ls). Not starting a second copy."; exit 1; }
 echo "== 1/4 cubes"; python scripts/05_build_patches.py $LIMIT --tag "$TAG"
 echo "== 2/4 R1 XGBoost (CPU, background) -> $LOG/r1.log"
 python scripts/06b_xgb.py --tag "$TAG" > "$LOG/r1.log" 2>&1 &

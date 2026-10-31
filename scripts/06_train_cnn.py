@@ -123,7 +123,7 @@ def main():
         print(f"  epoch {ep + 1}/{epochs}  loss {tot / steps:.4f}  {time.time() - t0:.0f} s", flush=True)
         if args.eval_every and (ep + 1) % args.eval_every == 0 and ep + 1 < epochs:
             if vcubes is None:
-                vcubes = torch.from_numpy(np.load(os.path.join(pdir, "val_cubes.npy"), mmap_mode="r")[:]).to(dev)
+                vcubes = torch.from_numpy(np.load(os.path.join(pdir, "val_cubes.npy")))   # stays in RAM; batches go to the GPU
             p = predict(model, vcubes, batch=ib, tta=R["tta"], transform=prep)
             c = froc(p, vmeta.gt_id, vmeta.ignore, n_gt=n_gt, n_scans=len(val_scans))["cpm"]
             curve.append({"epoch": ep + 1, "val_cpm": round(c, 4)})
@@ -139,7 +139,7 @@ def main():
     torch.save(model.state_dict(), ckpt)
 
     if vcubes is None:
-        vcubes = torch.from_numpy(np.load(os.path.join(pdir, "val_cubes.npy"), mmap_mode="r")[:]).to(dev)
+        vcubes = torch.from_numpy(np.load(os.path.join(pdir, "val_cubes.npy")))   # stays in RAM; batches go to the GPU
     scores = pd.DataFrame({"row": vmeta.row, "prob": predict(model, vcubes, batch=ib, tta=R["tta"], transform=prep)})
     first_seed = args.seed == cfg["discard"]["seeds"][0]
     if R["in_ch"] == 3 and first_seed and not args.suffix:                      # explanation: what does the network rely on?
