@@ -1,0 +1,31 @@
+# One place for every path and setting. Strings may use $SCRATCH (expanded at load time).
+paths:
+  scratch: $SCRATCH
+  raw: $SCRATCH/lidc_raw             # idc-index download root
+  lidc_dicom: $SCRATCH/lidc_raw/lidc_idri   # pylidc looks for <this>/LIDC-IDRI-XXXX/...
+  cache: $SCRATCH/cache_lungdet      # Phase 1: HU, 1 mm, lung mask per scan
+  candidates: $SCRATCH/candidates    # Phase 2-3: candidates.csv + 32 mm cubes
+  checkpoints: $SCRATCH/checkpoints  # Phase 3: .pth files (never in git)
+  results: results                   # small outputs, inside the repo
+
+ground_truth:                        # LUNA16 rule
+  max_slice_thickness_mm: 2.5
+  min_readers: 3                     # of 4
+  min_diameter_mm: 3.0
+
+isolate:
+  spacing_mm: 1.0
+  lung_threshold_hu: -320            # starting value, checked in Phase 1
+
+nominate:
+  size_range_mm: [3.0, 30.0]         # tuned on TRAIN scans in Phase 2
+
+discard:
+  cube_mm: 32
+  seeds: [42, 43, 44, 45, 46]
+
+split:
+  fractions: [0.70, 0.15, 0.15]      # train / val / test, by PATIENT
+  seed: 42
+
+gpus: "1,2,3"                        # GPU 0 is shared with other users
