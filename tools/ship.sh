@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # MAC: test -> commit (Claude as co-author) -> push, in one command. Stops if any test fails.
 #   bash tools/ship.sh "feat: what changed"
+#   NO_HOOKS=1 bash tools/ship.sh "..."   # skip git hooks (e.g. graphify) for this commit; tests still run
 set -euo pipefail
 cd "$(dirname "$0")/.."
 msg="${1:?usage: bash tools/ship.sh \"type: message\"}"
@@ -18,5 +19,5 @@ echo "tests run with: $PY"
 "$PY" -m pytest tests/ -q
 git add -A
 git status --short
-git commit -m "$msg" -m "Co-authored-by: Claude <noreply@anthropic.com>"
+git commit ${NO_HOOKS:+--no-verify} -m "$msg" -m "Co-authored-by: Claude <noreply@anthropic.com>"
 git push

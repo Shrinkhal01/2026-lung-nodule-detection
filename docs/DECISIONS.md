@@ -73,3 +73,64 @@
   - 15 → 20 gains only **+0.7 points** (about **1 nodule of 151**) but adds **+4.7% lung volume** (more chest wall and mediastinum → more false candidates in Phase 2)
 - Chosen on **train scans only**, because the test set must not shape any setting.
 - **Still open:** 5 scans < 2 L and 3 scans > 10 L in this set → a different failure, listed in the full-run report.
+
+### Full rerun with r = 15 (897 scans, 306 s, 64 workers)
+- GT nodules inside the mask: **99.6%** (5 of 1,192 outside: 14.4, 23.6, 24.0, 30.0, 31.3 mm, all wall-attached) → **PASS**.
+- Coordinates: median HU at GT centres **11 HU** → **PASS**.
+- Sanity ranges: lung 2–10 L in **98.7%**, median HU −950..−700 in **98.9%** (target 99%) → **20 outlier scans**, listed in `results/phase1/qc_outliers.md`.
+
+### The 20 outliers, checked by eye (`scripts/03c_qc_outliers.py`)
+- **15 look like real anatomy:**
+  - very large, over-inflated lungs: 10.0–11.3 L, HU down to −961
+  - small, dense lungs: 1.5–2.8 L, HU −560 to −760
+  - their masks stay 19–98 mm away from the image edge
+- **5 masks include body or outside air:** LIDC-IDRI-**0619, 0697, 0403, 0523, 0655**.
+- **Hypothesis "tissue-like scanner padding" → FALSE.** `scripts/03d_padding_check.py` shows a padding of **−3024** (air-like) or none, and the fix changed **nothing** (6.49 → 6.49 L, etc.).
+  - `padding_to_air` stays in as a tested guard. It only acts on non-air padding, which none of these scans have.
+- **Decision: accept and name the 5**, not fix them now, because:
+  - the mask is only the **search region**
+  - a mask that is **too big** adds false candidates that Phase 3 can reject; it does **not** lose nodules
+  - the number that matters, **nodules inside = 99.6%**, already passes
+  - Phase 2 reports their candidate counts separately; if they dominate the false alarms, we come back to them
+
+## Phase 2: nominate (BLOB)
+| Used | Why | Rejected alternative | Number that justified it |
+|---|---|---|---|
+| **Multi-scale LoG blob detector** | balls respond more than tubes (vessels) or sheets (walls); classical and explainable | threshold + connected blobs (vessel trees merge with nodules) | theory at matched size: ball **0.86 × contrast**, tube **0.73 ×** (`test_ball_beats_vessel`) |
+| **σ = 1, 1.5, 2.5, 4, 6, 9, 13 mm** | diameter ≈ 3.5 σ → 3.5–45 mm | one size | Phase 1: largest GT **46.8 mm**, 48 GT > 30 mm |
+| **Outside the mask set to −1000 HU** before LoG | the chest wall can't make blobs; wall-attached nodules stand out | LoG on the raw scan | NOT MEASURED |
+| **Peak HU > −700** | air can't be a nodule | no check | NOT MEASURED; size table will show ground-glass losses |
+| **Bundle = greedy NMS within the blob radius (≥ 3 mm)** | one blob → one candidate | keep all peaks | NOT MEASURED (see median peaks vs kept) |
+| **Threshold = fewest candidates with TRAIN recall ≥ 95%** | recall first; nothing later can recover a miss | fixed threshold | see `nominate_report.md` |
+| **R0 = rank by blob response only, FROC on VAL** | the "no learning" floor of the staircase | none | see `nominate_report.md` |
+
+### First full run: TRAIN recall stuck at 92.8% → diagnosis (`scripts/04b_miss_diagnosis.py`)
+| Cause of the 59 missed TRAIN nodules | Nodules | Median diameter | Median HU at centre |
+|---|:-:|:-:|:-:|
+| **ranked below the 3,000 cap** | **56** | 7.8 mm | −520 (faint / part-solid) |
+| erased by bundling | 2 | 9.3 mm | −28 |
+| below the −700 HU rule | 1 | 8.2 mm | −743 |
+- Scale-aware bundling recovers **0** within the cap → bundling was **not** the problem. My suspicion was wrong; the measurement decided.
+- **The cap was the problem.** Each scan has about **20,860** bundled candidates, and small, faint nodules rank below big bright vessels.
+- **Fix:**
+  - store up to **30,000** per scan
+  - sweep two selection rules **on TRAIN only**:
+    - global top-N
+    - **per-size top-q**, where each blob size gets its own quota, so small faint blobs don't compete with big bright ones
+  - the script **picks automatically** (fewest candidates reaching 95% TRAIN recall)
+
+### Phase 2 result (`scripts/04_nominate.py`, chosen automatically on TRAIN)
+- **per-size top-1200**: TRAIN recall **96.0%** at **2,643** candidates/scan.
+  - Global top-N needs **5,000**/scan for 95.7% → per-size quotas **halve** the candidates.
+- TRAIN recall by size: 3–6 mm **84.1%**, 6–10 **95.6%**, 10–20 **98.8%**, 20–30 **98.4%**, > 30 **100%**.
+- R0 (blob strength only, no learning) VAL CPM **0.088**.
+
+## Phase 3: discard (R1–R4), one command `tools/phase3.sh`
+| Used | Why | Rejected alternative | Number that justified it |
+|---|---|---|---|
+| **TRAIN sample** per scan: positives + GT centre ×5 (jitter ±2 mm) + 150 random + 50 hardest negatives | 2,643 candidates × 628 scans = 1.66 M is too many; balance matters more than volume | all candidates | NOT MEASURED |
+| **Balanced batches** (25% positives) | positives are < 5% of candidates | plain shuffling | prevention |
+| **Small 3D CNN** (4 blocks, ~1.5 M weights) on 32 mm cubes | fast on H200; cubes are small | 3D ResNet-18 (33 M weights in v2) | NOT MEASURED |
+| **R3 = focal loss + hard negatives + rot90 + 8-flip TTA** | each "advanced" trick in one rung vs R2 | separate rungs per trick | 2-day budget |
+| **R4 fusion cross-fitted on VAL** (5 folds by patient) | the fusion never scores a candidate it was fitted on | fit and score on the same val | prevention |
+| **5 seeds** for R2 and R3 | one run moves by chance (v2 lesson) | 1 seed | v2: ±0.01 AUC between runs |
