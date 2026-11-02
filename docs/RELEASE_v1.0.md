@@ -1,3 +1,4 @@
+
 # v1.0: Lung nodule detection, a hybrid explainable 3D pipeline on LIDC-IDRI
 
 **Research prototype, not a medical device.** Finds lung nodules ≥ 3 mm (the ones ≥ 3 of 4 radiologists agreed on) in a full chest CT. Says nothing about cancer.
