@@ -29,7 +29,7 @@ python predict.py /path/to/dicom_folder --fp-per-scan 1 --out out/
 - **One dataset (LIDC-IDRI)**, no external hospital; labels are radiologist consensus, not pathology.
 - `predict.py` adds a **VAL-picked threshold** and a **merge step** that TEST did not measure.
 - `predict.py` was run end to end on a **synthetic phantom** and unit tests; one real TEST scan was run on a Mac CPU (43 min, both nodules found, 1 false alarm); that is a plumbing check, not a result.
-- Weights are trained on LIDC-IDRI (CC BY 3.0) only. **No code licence chosen yet.**
+- Weights are trained on LIDC-IDRI (CC BY 3.0) only. **Code licence:** MIT ([`LICENSE`](../LICENSE)).
 
 ## Data and references
 LIDC-IDRI: Armato SG III et al. (2015), TCIA, https://doi.org/10.7937/K9/TCIA.2015.LO9QL9SX. LUNA16 rule + CPM: Setio et al., *Med Image Anal* 2017. More in the README.

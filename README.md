@@ -176,7 +176,7 @@ python scripts/13_make_figures.py && python -m pytest tests/ -q
 - **pylidc:** Hancock MC, Magnan JF, *J Med Imaging* 3(4):044504, 2016.
 - **LUNA16 rule + CPM:** Setio AAA et al., *Medical Image Analysis* 42:1–13, 2017.
 - **Occlusion sensitivity:** Zeiler MD, Fergus R, ECCV 2014. **Sanity checks for saliency maps:** Adebayo J et al., NeurIPS 2018.
-- **Code licence:** *not chosen yet*. Add a `LICENSE` file before others reuse the code.
+- **Code licence:** MIT ([`LICENSE`](LICENSE)).
 
 ## Credits
 

@@ -167,7 +167,7 @@ Each layer: **what → why (because) → how it was checked → file**.
 - **Probability is a rank score**, not calibrated (`NOT MEASURED`).
 - **VAL used for choices** → VAL slightly optimistic; headline uses TEST only.
 - **Built in ~2 days**, no large hyper-parameter search.
-- **Code licence not chosen yet** (add a `LICENSE` before reuse).
+- **Code licence:** MIT ([`LICENSE`](../LICENSE)).
 
 ---
 
