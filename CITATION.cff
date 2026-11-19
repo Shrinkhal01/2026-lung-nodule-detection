@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use this software, pipeline (FINDERS), or experimental benchmarks in your research, please cite it using the metadata below."
+type: software
+title: "Lung Nodule Detection: A Hybrid, Explainable 3D Pipeline on LIDC-IDRI (FINDERS / HUSH)"
+version: "1.0.1"
+doi: "10.5281/zenodo.24375373"
+date-released: "2026-11-19"
+url: "https://github.com/Shrinkhal01/2026-lung-nodule-detection"
+repository-code: "https://github.com/Shrinkhal01/2026-lung-nodule-detection"
+license: MIT
+authors:
+  - given-names: "Shrinkhal"
+    affiliation: "Central University of Karnataka"
+abstract: >
+  A reproducible, explainable 3D pulmonary nodule detection pipeline (FINDERS) evaluated on the LIDC-IDRI chest CT dataset. Combines multi-scale Laplacian of Gaussian (LoG) candidate nomination with a 5-seed 3D CNN ensemble operating on Hounsfield Unit (HU) and Hessian shape channels (HUSH: blobness and vesselness), validated via patient-level splits and occlusion explainability maps.
+keywords:
+  - lung nodule detection
+  - 3D CNN
+  - medical image analysis
+  - chest CT
+  - LIDC-IDRI
+  - explainable AI
+  - Hessian shape features
+  - computer-aided detection
