@@ -1,5 +1,7 @@
 # Lung Nodule Detection: a Hybrid, Explainable 3D Pipeline on LIDC-IDRI
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24375373.svg)](https://doi.org/10.5281/zenodo.24375373)
+
 > **v1.0 · research prototype, not a medical device.** Finds what **3 of 4 radiologists agreed is a nodule (≥ 3 mm)** in a full chest CT. It says nothing about cancer.
 > Every number below comes from a script in this repo; the evidence is in [`docs/REALITY_CHECK.md`](docs/REALITY_CHECK.md).
 
